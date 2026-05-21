@@ -4,7 +4,7 @@
     {
       "name": "loom-spec-view",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "loom-spec", "dev:view"],
+      "runtimeArgs": ["--filter", "loom-spec", "dev"],
       "port": 7777
     }
   ]

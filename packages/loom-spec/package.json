@@ -18,6 +18,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts",
+    "dev": "concurrently -n server,view -c blue,magenta \"pnpm dev:server\" \"pnpm dev:view\"",
+    "dev:server": "tsx src/server/index.ts --dev --root ../../examples/todo-app --port 7778",
     "dev:view": "vite --config src/view/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/view/tsconfig.json --noEmit",
     "generate-types": "tsx scripts/generate-types.ts",
@@ -26,9 +28,11 @@
   "keywords": ["architecture", "diagram", "node-based", "spec", "ai", "agent"],
   "license": "MIT",
   "dependencies": {
+    "@hono/node-server": "^1.13.7",
     "@xyflow/react": "^12.3.5",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
+    "hono": "^4.6.13",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -38,6 +42,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
     "json-schema-to-typescript": "^15.0.3",
     "tsx": "^4.19.2",
     "typescript": "^5.6.0",

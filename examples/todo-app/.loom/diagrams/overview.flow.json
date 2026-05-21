@@ -9,57 +9,95 @@
       "type": "ui",
       "label": "Todo List View",
       "description": "Renders todos, dispatches actions on toggle/delete.",
-      "position": { "x": 80, "y": 160 },
+      "position": {
+        "x": 80,
+        "y": 160
+      },
       "status": "implemented",
       "code_refs": [
-        { "path": "src/views/TodoList.tsx", "symbol": "TodoList" }
+        {
+          "path": "src/views/TodoList.tsx",
+          "symbol": "TodoList"
+        }
       ],
-      "properties": { "framework": "react" },
-      "tags": ["public", "critical-path"]
+      "properties": {
+        "framework": "react"
+      },
+      "tags": [
+        "public",
+        "critical-path"
+      ]
     },
     {
       "id": "todo-api",
       "type": "service",
       "label": "Todo API",
       "description": "REST endpoints: GET /todos, POST /todos, PATCH /todos/:id, DELETE /todos/:id.",
-      "position": { "x": 400, "y": 160 },
+      "position": {
+        "x": 400,
+        "y": 160
+      },
       "status": "implemented",
       "code_refs": [
-        { "path": "src/server/routes/todos.ts", "symbol": "todoRouter" }
+        {
+          "path": "src/server/routes/todos.ts",
+          "symbol": "todoRouter"
+        }
       ],
-      "properties": { "language": "typescript", "runtime": "node" }
+      "properties": {
+        "language": "typescript",
+        "runtime": "node"
+      }
     },
     {
       "id": "todo-store",
       "type": "data",
       "label": "Todo Store",
       "description": "Persistent todos, one row per todo.",
-      "position": { "x": 720, "y": 160 },
+      "position": {
+        "x": 720,
+        "y": 160
+      },
       "status": "implemented",
       "code_refs": [
-        { "path": "src/server/db/todos.ts", "symbol": "todosTable" }
+        {
+          "path": "src/server/db/todos.ts",
+          "symbol": "todosTable"
+        }
       ],
-      "properties": { "engine": "postgres" }
+      "properties": {
+        "engine": "postgres"
+      }
     },
     {
       "id": "todo-completed-event",
       "type": "event",
       "label": "Todo Completed",
       "description": "Emitted when a todo flips to done — feeds the celebration UI.",
-      "position": { "x": 400, "y": 360 },
+      "position": {
+        "x": 400,
+        "y": 360
+      },
       "status": "planned",
       "code_refs": [],
-      "properties": { "channel": "ui-events" }
+      "properties": {
+        "channel": "ui-events"
+      }
     },
     {
       "id": "confetti",
       "type": "ui",
       "label": "Confetti Burst",
       "description": "Visual celebration on completion.",
-      "position": { "x": 720, "y": 360 },
+      "position": {
+        "x": 720,
+        "y": 360
+      },
       "status": "planned",
       "code_refs": [],
-      "properties": { "framework": "react" }
+      "properties": {
+        "framework": "react"
+      }
     }
   ],
   "edges": [
@@ -103,7 +141,10 @@
     {
       "id": "celebration",
       "label": "Celebration (planned)",
-      "children": ["todo-completed-event", "confetti"],
+      "children": [
+        "todo-completed-event",
+        "confetti"
+      ],
       "color": "#fef3c7"
     }
   ]

@@ -16,6 +16,12 @@ export default defineConfig({
       // Allow serving files from the workspace root (so we can read examples/ during dev)
       allow: [resolve(__dirname, "../../../../")],
     },
+    proxy: {
+      "/api": {
+        target: "http://localhost:7778",
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {
