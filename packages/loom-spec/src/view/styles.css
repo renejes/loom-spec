@@ -506,8 +506,59 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 
 /* ─── Timeline view ─────────────────────────────────────────────── */
 .timeline-app {
-  /* same as .app — single column canvas + inspector. Subtitled grid. */
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "topbar topbar"
+    "transport transport"
+    "canvas inspector";
 }
+.timeline-app .transport-bar {
+  grid-area: transport;
+}
+
+.transport-bar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.transport-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.transport-position {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--text);
+  margin-left: 8px;
+}
+.transport-position .muted { color: var(--text-muted); }
+.transport-spacer { flex: 1; }
+.transport-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+.transport-speed select {
+  background: var(--bg-canvas);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.transport-speed .muted { color: var(--text-muted); }
+
 .timeline-canvas-wrap {
   padding: 16px;
   overflow: auto;
@@ -580,6 +631,21 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 }
 .timeline-clip.kind-error rect {
   stroke: var(--status-stale) !important;
+}
+.timeline-clip.active rect {
+  filter: brightness(1.18) drop-shadow(0 0 6px var(--accent));
+}
+.timeline-clip.ghost rect {
+  opacity: 0.6;
+}
+
+.timeline-playhead-line {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.timeline-playhead-handle {
+  fill: var(--accent);
 }
 
 /* ─── Node card (rendered inside xyflow node) ──────────────────── */

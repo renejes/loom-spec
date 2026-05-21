@@ -1,24 +1,26 @@
-import { useEffect, useRef, useState } from "react";
-import type { LoomTimeline } from "../types/timeline";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { LoomTimeline, TimelineEvent } from "../types/timeline";
 import type { LoomDiagram } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
-import { loadDiagram, loadTimeline } from "./loadDiagram";
-import type { ConnectionStatus } from "./state";
+import { loadDiagram, loadTimeline, saveTimeline } from "./loadDiagram";
+import type { ConnectionStatus, SaveStatus } from "./state";
 
 interface TimelineStateInternal {
   timeline: LoomTimeline | null;
   diagram: LoomDiagram | null;
   nodeTypes: LoomNodeTypes | null;
   loadError: string | null;
+  saveStatus: SaveStatus;
+  saveError: string | null;
   connectionStatus: ConnectionStatus;
 }
 
+const SAVE_DEBOUNCE_MS = 500;
+
 /**
- * Read-only state for a timeline view. Loads the timeline file, its
- * referenced diagram (for node type lookup), and node-types (for
- * colors). Re-fetches when external edits arrive via SSE.
- *
- * Edit mutators come in step 15c.
+ * State for a single timeline view: the timeline itself, the referenced
+ * diagram, node-types (for coloring), live-sync over SSE, and mutators
+ * with debounced auto-save mirroring the diagram state pattern.
  */
 export function useTimelineState(id: string) {
   const [state, setState] = useState<TimelineStateInternal>({
@@ -26,22 +28,30 @@ export function useTimelineState(id: string) {
     diagram: null,
     nodeTypes: null,
     loadError: null,
+    saveStatus: "idle",
+    saveError: null,
     connectionStatus: "connecting",
   });
+
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTimeline = useRef<LoomTimeline | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const initialLoadDone = useRef(false);
 
-  // Initial + reactive loads (re-fires when id changes)
+  // Initial + reactive loads
   useEffect(() => {
     let cancelled = false;
+    initialLoadDone.current = false;
 
     async function load() {
       try {
         const timeline = await loadTimeline(id);
         if (cancelled) return;
-        // Load the referenced diagram + node-types for rendering context.
         const spec = await loadDiagram(timeline.diagram);
         if (cancelled) return;
+        latestTimeline.current = timeline;
+        initialLoadDone.current = true;
         setState((s) => ({
           ...s,
           timeline,
@@ -64,8 +74,70 @@ export function useTimelineState(id: string) {
     };
   }, [id]);
 
-  // SSE subscription — refetch when this timeline (or its underlying
-  // diagram/node-types) changes externally.
+  // Debounced auto-save
+  const scheduleSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setState((s) => ({ ...s, saveStatus: "dirty", saveError: null }));
+    saveTimer.current = setTimeout(async () => {
+      const tl = latestTimeline.current;
+      if (!tl) return;
+      setState((s) => ({ ...s, saveStatus: "saving" }));
+      try {
+        await saveTimeline(tl);
+        setState((s) => ({ ...s, saveStatus: "saved" }));
+      } catch (e) {
+        setState((s) => ({
+          ...s,
+          saveStatus: "error",
+          saveError: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    }, SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // Mutators
+  const updateTimeline = useCallback(
+    (updater: (tl: LoomTimeline) => LoomTimeline) => {
+      if (!initialLoadDone.current) return;
+      setState((s) => {
+        if (!s.timeline) return s;
+        const next = updater(s.timeline);
+        latestTimeline.current = next;
+        return { ...s, timeline: next };
+      });
+      scheduleSave();
+    },
+    [scheduleSave]
+  );
+
+  const updateEvent = useCallback(
+    (eventId: string, updater: (e: TimelineEvent) => TimelineEvent) => {
+      updateTimeline((tl) => ({
+        ...tl,
+        events: tl.events.map((e) => (e.id === eventId ? updater(e) : e)),
+      }));
+    },
+    [updateTimeline]
+  );
+
+  const addEvent = useCallback(
+    (event: TimelineEvent) => {
+      updateTimeline((tl) => ({ ...tl, events: [...tl.events, event] }));
+    },
+    [updateTimeline]
+  );
+
+  const deleteEvent = useCallback(
+    (eventId: string) => {
+      updateTimeline((tl) => ({
+        ...tl,
+        events: tl.events.filter((e) => e.id !== eventId),
+      }));
+    },
+    [updateTimeline]
+  );
+
+  // SSE — refetch on external changes, but don't clobber unsaved local edits
   useEffect(() => {
     setState((s) => ({ ...s, connectionStatus: "connecting" }));
     const es = new EventSource("/api/events");
@@ -76,15 +148,19 @@ export function useTimelineState(id: string) {
       setState((s) => ({ ...s, connectionStatus: "disconnected" }));
 
     const refetch = async () => {
+      const status = stateRef.current.saveStatus;
+      if (status === "dirty" || status === "saving") return;
       try {
         const timeline = await loadTimeline(id);
         const spec = await loadDiagram(timeline.diagram);
+        latestTimeline.current = timeline;
         setState((s) => ({
           ...s,
           timeline,
           diagram: spec.diagram,
           nodeTypes: spec.nodeTypes,
-          loadError: null,
+          saveStatus: "idle",
+          saveError: null,
         }));
       } catch {
         // keep current state on transient failure
@@ -110,7 +186,7 @@ export function useTimelineState(id: string) {
           refetch();
         }
       } catch {
-        // ignore malformed
+        // ignore malformed events
       }
     });
 
@@ -119,5 +195,29 @@ export function useTimelineState(id: string) {
     };
   }, [id]);
 
-  return state;
+  // Cleanup pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+
+  const api = useMemo(
+    () => ({
+      ...state,
+      updateEvent,
+      addEvent,
+      deleteEvent,
+    }),
+    [state, updateEvent, addEvent, deleteEvent]
+  );
+
+  return api;
+}
+
+export function uniqueEventId(tl: LoomTimeline): string {
+  const ids = new Set(tl.events.map((e) => e.id));
+  let i = tl.events.length + 1;
+  while (ids.has(`ev${i}`)) i++;
+  return `ev${i}`;
 }

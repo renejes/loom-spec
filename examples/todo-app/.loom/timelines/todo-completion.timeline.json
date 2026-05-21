@@ -5,10 +5,26 @@
   "description": "End-to-end sequence when the user toggles a todo: client → API → DB → optimistic UI update → planned celebration burst.",
   "diagram": "overview",
   "tracks": [
-    { "id": "client", "label": "Browser", "color": "#dbeafe" },
-    { "id": "server", "label": "API server", "color": "#dcfce7" },
-    { "id": "data", "label": "Postgres", "color": "#ede9fe" },
-    { "id": "events", "label": "Events", "color": "#fef3c7" }
+    {
+      "id": "client",
+      "label": "Browser",
+      "color": "#dbeafe"
+    },
+    {
+      "id": "server",
+      "label": "API server",
+      "color": "#dcfce7"
+    },
+    {
+      "id": "data",
+      "label": "Postgres",
+      "color": "#ede9fe"
+    },
+    {
+      "id": "events",
+      "label": "Events",
+      "color": "#fef3c7"
+    }
   ],
   "events": [
     {
@@ -20,9 +36,15 @@
       "kind": "compute",
       "label": "toggle checkbox + dispatch",
       "code_refs": [
-        { "path": "src/views/TodoList.tsx", "symbol": "handleToggle" }
+        {
+          "path": "src/views/TodoList.tsx",
+          "symbol": "handleToggle"
+        }
       ],
-      "tags": ["critical-path", "user-input"]
+      "tags": [
+        "critical-path",
+        "user-input"
+      ]
     },
     {
       "id": "ev2",
@@ -33,10 +55,15 @@
       "kind": "compute",
       "label": "PATCH /todos/:id",
       "code_refs": [
-        { "path": "src/server/routes/todos.ts", "symbol": "updateTodo" }
+        {
+          "path": "src/server/routes/todos.ts",
+          "symbol": "updateTodo"
+        }
       ],
       "triggered_by": "ev1",
-      "tags": ["critical-path"]
+      "tags": [
+        "critical-path"
+      ]
     },
     {
       "id": "ev3",
@@ -47,10 +74,16 @@
       "kind": "io",
       "label": "UPDATE row",
       "code_refs": [
-        { "path": "src/server/db/todos.ts", "symbol": "markDone" }
+        {
+          "path": "src/server/db/todos.ts",
+          "symbol": "markDone"
+        }
       ],
       "triggered_by": "ev2",
-      "tags": ["critical-path", "db-write"]
+      "tags": [
+        "critical-path",
+        "db-write"
+      ]
     },
     {
       "id": "ev4",
@@ -61,10 +94,15 @@
       "kind": "compute",
       "label": "render done state",
       "code_refs": [
-        { "path": "src/views/TodoList.tsx", "symbol": "TodoItem" }
+        {
+          "path": "src/views/TodoList.tsx",
+          "symbol": "TodoItem"
+        }
       ],
       "triggered_by": "ev2",
-      "tags": ["critical-path"]
+      "tags": [
+        "critical-path"
+      ]
     },
     {
       "id": "ev5",
@@ -75,7 +113,9 @@
       "kind": "compute",
       "label": "emit",
       "triggered_by": "ev4",
-      "tags": ["fan-out"]
+      "tags": [
+        "fan-out"
+      ]
     },
     {
       "id": "ev6",
@@ -86,7 +126,9 @@
       "kind": "compute",
       "label": "burst animation",
       "triggered_by": "ev5",
-      "tags": ["background"]
+      "tags": [
+        "background"
+      ]
     }
   ]
 }
