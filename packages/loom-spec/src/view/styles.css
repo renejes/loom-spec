@@ -184,6 +184,98 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   margin-bottom: 4px;
 }
 
+/* ─── Form inputs (Inspector) ───────────────────────────────── */
+.input {
+  width: 100%;
+  background: var(--bg-canvas);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.1s, box-shadow 0.1s;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+.input.textarea {
+  resize: vertical;
+  min-height: 56px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.status-line {
+  height: 2px;
+  margin-top: 6px;
+  border-radius: 2px;
+}
+
+/* ─── Save indicator (TopBar) ───────────────────────────────── */
+.save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.save-indicator.dirty   { color: var(--text-muted); background: var(--bg-canvas); }
+.save-indicator.saving  { color: var(--accent);     background: color-mix(in oklab, var(--accent) 15%, transparent); }
+.save-indicator.saved   { color: var(--status-implemented); background: color-mix(in oklab, var(--status-implemented) 15%, transparent); }
+.save-indicator.error   { color: var(--status-stale); background: color-mix(in oklab, var(--status-stale) 15%, transparent); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Add Node menu ─────────────────────────────────────────── */
+.add-node-menu {
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  z-index: 100;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  min-width: 220px;
+}
+.add-node-menu-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px;
+}
+.add-node-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text);
+}
+.add-node-item:hover { background: var(--bg-hover); }
+.add-node-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--node-color);
+  flex-shrink: 0;
+}
+.add-node-text { display: flex; flex-direction: column; gap: 2px; }
+.add-node-label { font-size: 13px; font-weight: 500; }
+.add-node-key { font-size: 11px; color: var(--text-muted); }
+
 /* ─── Node card (rendered inside xyflow node) ──────────────────── */
 .node-card {
   background: var(--bg-elevated);
