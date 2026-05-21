@@ -54,3 +54,14 @@ export async function saveDiagram(diagram: LoomDiagram): Promise<void> {
     );
   }
 }
+
+export async function createEmptyDiagram(id: string, title: string): Promise<void> {
+  const diagram: LoomDiagram = {
+    version: "1",
+    id,
+    title,
+    nodes: [],
+    edges: [],
+  };
+  await saveDiagram(diagram);
+}

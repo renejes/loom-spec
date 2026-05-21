@@ -244,9 +244,7 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 
 /* ─── Add Node menu ─────────────────────────────────────────── */
 .add-node-menu {
-  position: absolute;
-  top: 52px;
-  right: 16px;
+  position: fixed;
   z-index: 100;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -287,6 +285,115 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .add-node-text { display: flex; flex-direction: column; gap: 2px; }
 .add-node-label { font-size: 13px; font-weight: 500; }
 .add-node-key { font-size: 11px; color: var(--text-muted); }
+
+/* ─── Diagram switcher ──────────────────────────────────────── */
+.diagram-switcher {
+  position: relative;
+  flex-shrink: 0;
+}
+.switcher-trigger {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 6px 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text);
+  border-radius: 6px;
+  max-width: 320px;
+}
+.switcher-trigger:hover {
+  background: var(--bg-canvas);
+  border-color: var(--border);
+}
+.switcher-trigger .switcher-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+.switcher-trigger .flip {
+  transform: rotate(180deg);
+}
+.switcher-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  z-index: 100;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  min-width: 280px;
+  max-width: 380px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.switcher-empty {
+  padding: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+.switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 400;
+}
+.switcher-item:hover { background: var(--bg-hover); }
+.switcher-item.active {
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+.switcher-item.active .switcher-item-title {
+  color: var(--accent);
+}
+.switcher-item-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.switcher-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.switcher-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.switcher-item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.switcher-item-meta code { font-size: 11px; }
+.switcher-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+.switcher-item.new {
+  color: var(--accent);
+  font-weight: 500;
+}
 
 /* ─── Node card (rendered inside xyflow node) ──────────────────── */
 .node-card {

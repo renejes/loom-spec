@@ -1,16 +1,23 @@
 import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft } from "lucide-react";
 import { useTheme } from "../theme";
 import type { SaveStatus } from "../state";
+import { DiagramSwitcher } from "./DiagramSwitcher";
+import type { DiagramSummary } from "../loadDiagram";
 
 interface Props {
+  diagramId: string;
   title: string;
   subtitle?: string;
+  diagrams: DiagramSummary[];
   saveStatus: SaveStatus;
   saveError: string | null;
   onClickAdd: () => void;
   addMenuOpen: boolean;
   isDefault: boolean;
   onClickHome: () => void;
+  onNavigate: (id: string) => void;
+  onCreateDiagram: () => void;
+  addButtonRef: React.RefObject<HTMLButtonElement>;
 }
 
 function SaveIndicator({
@@ -49,14 +56,19 @@ function SaveIndicator({
 }
 
 export function TopBar({
+  diagramId,
   title,
   subtitle,
+  diagrams,
   saveStatus,
   saveError,
   onClickAdd,
   addMenuOpen,
   isDefault,
   onClickHome,
+  onNavigate,
+  onCreateDiagram,
+  addButtonRef,
 }: Props) {
   const { theme, toggleTheme } = useTheme();
   return (
@@ -71,10 +83,17 @@ export function TopBar({
           <ChevronLeft size={14} /> Overview
         </button>
       )}
-      <div className="title">{title}</div>
+      <DiagramSwitcher
+        currentId={diagramId}
+        currentTitle={title}
+        diagrams={diagrams}
+        onNavigate={onNavigate}
+        onCreate={onCreateDiagram}
+      />
       {subtitle && <div className="subtitle">{subtitle}</div>}
       <SaveIndicator status={saveStatus} error={saveError} />
       <button
+        ref={addButtonRef}
         onClick={onClickAdd}
         title="Add node"
         aria-label="Add node"
