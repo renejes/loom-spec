@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
   Monitor, Server, Database, Zap, Globe,
-  Box, Music, Sliders, CornerDownRight,
+  Box, Music, Sliders, CornerDownRight, Paperclip,
   type LucideIcon,
 } from "lucide-react";
 import type { Node as LoomNode } from "../../types/diagram";
@@ -99,6 +99,19 @@ export function NodeCard({ data }: NodeProps) {
       </div>
       <div className="node-label">{node.label}</div>
       <span className="status-dot" title={node.status} />
+
+      {(node.code_refs?.length ?? 0) > 0 && (
+        <span
+          className="refs-badge"
+          title={
+            (node.code_refs ?? [])
+              .map((r) => r.path + (r.symbol ? ` · ${r.symbol}` : ""))
+              .join("\n") || "Code refs"
+          }
+        >
+          <Paperclip size={9} /> {node.code_refs!.length}
+        </span>
+      )}
 
       {node.drill_down && onDrillDown && (
         <button

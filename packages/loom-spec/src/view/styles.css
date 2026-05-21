@@ -545,6 +545,30 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   background: var(--status-color, var(--text-subtle));
 }
 
+.node-card .refs-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px 1px 4px;
+  font-family: ui-monospace, monospace;
+  line-height: 1.2;
+  pointer-events: auto;
+  white-space: pre;
+}
+.node-card .refs-badge:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
 .drill-down-btn {
   position: absolute;
   bottom: 6px;
