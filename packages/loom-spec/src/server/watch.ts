@@ -11,33 +11,57 @@ export interface LoomChangeEvent {
  * Watches `.loom/` for changes from external editors (humans, AI agents).
  * Self-writes (from our own PUT endpoint) are suppressed within a short
  * grace window so the UI doesn't react to its own edits.
+ *
+ * The watcher does not throw on startup if the target dir is missing — it
+ * just logs a warning. chokidar errors are caught and logged so a transient
+ * filesystem hiccup doesn't crash the server.
  */
 export class LoomWatcher extends EventEmitter {
-  private watcher: FSWatcher;
+  private watcher: FSWatcher | null = null;
   private recentSelfWrites = new Map<string, number>();
   private static SUPPRESS_MS = 1500;
 
-  constructor(loomPath: string) {
+  constructor(private loomPath: string) {
     super();
-    this.watcher = chokidarWatch(
-      [
-        resolve(loomPath, "diagrams"),
-        resolve(loomPath, "node-types.json"),
-      ],
-      {
-        ignoreInitial: true,
-        awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 50 },
-      }
-    );
-    this.watcher.on("all", (_eventName: string, path: string) => {
-      if (this.isSelfWrite(path)) return;
-      if (path.endsWith("/node-types.json")) {
-        this.emit("change", { type: "node-types-changed" });
-      } else if (path.endsWith(".flow.json")) {
-        const id = basename(path, ".flow.json");
-        this.emit("change", { type: "diagram-changed", id });
-      }
-    });
+    this.start();
+  }
+
+  private start() {
+    try {
+      this.watcher = chokidarWatch(
+        [
+          resolve(this.loomPath, "diagrams"),
+          resolve(this.loomPath, "node-types.json"),
+        ],
+        {
+          ignoreInitial: true,
+          awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 50 },
+        }
+      );
+
+      this.watcher.on("all", (_eventName: string, path: string) => {
+        if (this.isSelfWrite(path)) return;
+        if (path.endsWith("/node-types.json")) {
+          this.emit("change", { type: "node-types-changed" });
+        } else if (path.endsWith(".flow.json")) {
+          const id = basename(path, ".flow.json");
+          this.emit("change", { type: "diagram-changed", id });
+        }
+      });
+
+      this.watcher.on("error", (err) => {
+        console.warn(
+          `[loom-spec watcher] error: ${(err as Error).message}. ` +
+            "Live sync may be degraded; server continues serving."
+        );
+      });
+    } catch (err) {
+      console.warn(
+        `[loom-spec watcher] failed to start: ${(err as Error).message}. ` +
+          "Live sync disabled; server continues serving."
+      );
+      this.watcher = null;
+    }
   }
 
   /**
@@ -59,6 +83,13 @@ export class LoomWatcher extends EventEmitter {
   }
 
   async close() {
-    await this.watcher.close();
+    if (this.watcher) {
+      try {
+        await this.watcher.close();
+      } catch {
+        // ignore close errors on shutdown
+      }
+      this.watcher = null;
+    }
   }
 }

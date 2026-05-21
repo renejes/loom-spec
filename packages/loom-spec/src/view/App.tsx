@@ -130,6 +130,7 @@ export function App() {
         saveStatus={state.saveStatus}
         saveError={state.saveError}
         connectionStatus={state.connectionStatus}
+        validationErrorCount={state.validationErrors.length}
         onClickAdd={() => setAddMenuOpen((v) => !v)}
         addMenuOpen={addMenuOpen}
         isDefault={isDefault}
@@ -169,6 +170,7 @@ export function App() {
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
         nodeTypes={state.nodeTypes}
+        validationErrors={state.validationErrors}
         onUpdateNode={state.updateNode}
         onUpdateEdge={state.updateEdge}
       />

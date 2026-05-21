@@ -51,6 +51,29 @@
       "fields": [
         { "name": "url", "type": "string", "required": false }
       ]
+    },
+    "audio-track": {
+      "label": "Audio Track",
+      "description": "Audio source or process with typed in/out ports. Demonstrates the per-port handle feature; nothing in the todo-app actually uses this.",
+      "color": "#f472b6",
+      "icon": "music",
+      "fields": [
+        {
+          "name": "channels",
+          "type": "enum",
+          "values": ["mono", "stereo"],
+          "required": false
+        }
+      ],
+      "ports": {
+        "in": [
+          { "name": "audio_in", "signal": "audio" },
+          { "name": "cv", "signal": "control" }
+        ],
+        "out": [
+          { "name": "audio_out", "signal": "audio" }
+        ]
+      }
     }
   }
 }

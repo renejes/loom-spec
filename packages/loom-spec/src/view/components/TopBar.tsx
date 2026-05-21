@@ -1,4 +1,4 @@
-import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft, Wifi, WifiOff } from "lucide-react";
+import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { useTheme } from "../theme";
 import type { SaveStatus, ConnectionStatus } from "../state";
 import { DiagramSwitcher } from "./DiagramSwitcher";
@@ -12,6 +12,7 @@ interface Props {
   saveStatus: SaveStatus;
   saveError: string | null;
   connectionStatus: ConnectionStatus;
+  validationErrorCount: number;
   onClickAdd: () => void;
   addMenuOpen: boolean;
   isDefault: boolean;
@@ -98,6 +99,7 @@ export function TopBar({
   saveStatus,
   saveError,
   connectionStatus,
+  validationErrorCount,
   onClickAdd,
   addMenuOpen,
   isDefault,
@@ -127,6 +129,14 @@ export function TopBar({
         onCreate={onCreateDiagram}
       />
       {subtitle && <div className="subtitle">{subtitle}</div>}
+      {validationErrorCount > 0 && (
+        <span
+          className="validation-chip"
+          title={`${validationErrorCount} validation issue${validationErrorCount === 1 ? "" : "s"} — check the inspector`}
+        >
+          <AlertTriangle size={12} /> {validationErrorCount}
+        </span>
+      )}
       <ConnectionDot status={connectionStatus} />
       <SaveIndicator status={saveStatus} error={saveError} />
       <button

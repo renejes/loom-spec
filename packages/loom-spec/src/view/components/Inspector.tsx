@@ -6,13 +6,24 @@ import type {
   CodeRef,
 } from "../../types/diagram";
 import type { LoomNodeTypes, Field, NodeType } from "../../types/node-types";
+import {
+  errorsForEdge,
+  errorsForNode,
+  type ValidationError,
+} from "../validate-client";
 
 interface Props {
   selectedNode: LoomNode | null;
   selectedEdge: LoomEdge | null;
   nodeTypes: LoomNodeTypes;
+  validationErrors: ValidationError[];
   onUpdateNode: (id: string, updater: (n: LoomNode) => LoomNode) => void;
   onUpdateEdge: (id: string, updater: (e: LoomEdge) => LoomEdge) => void;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <div className="field-error">{message}</div>;
 }
 
 const STATUS_COLOR: Record<LoomNode["status"], string> = {
@@ -56,6 +67,7 @@ export function Inspector(props: Props) {
 function NodeInspector({
   node,
   nodeTypes,
+  validationErrors,
   onUpdateNode,
 }: Props & { node: LoomNode }) {
   const typeDef: NodeType | undefined = nodeTypes.types[node.type];
@@ -63,6 +75,7 @@ function NodeInspector({
   const properties = node.properties ?? {};
   const codeRefs = node.code_refs ?? [];
   const tags = node.tags ?? [];
+  const errors = errorsForNode(validationErrors, node.id);
 
   const update = (updater: (n: LoomNode) => LoomNode) =>
     onUpdateNode(node.id, updater);
@@ -91,6 +104,7 @@ function NodeInspector({
             update((n) => ({ ...n, label: e.target.value }))
           }
         />
+        <FieldError message={errors.label} />
       </div>
 
       <div className="field">
@@ -120,6 +134,7 @@ function NodeInspector({
       <div className="field">
         <div className="field-label">ID</div>
         <div className="field-value"><code>{node.id}</code></div>
+        <FieldError message={errors.id} />
       </div>
 
       <div className="field">
@@ -133,6 +148,7 @@ function NodeInspector({
             update((n) => ({ ...n, description: e.target.value || undefined }))
           }
         />
+        <FieldError message={errors.description} />
       </div>
 
       {(typeDef?.fields ?? []).length > 0 && (
@@ -151,6 +167,7 @@ function NodeInspector({
 
       <div className="field">
         <div className="field-label">Code refs</div>
+        <FieldError message={errors.code_refs} />
         {codeRefs.map((ref, i) => (
           <div key={i} className="code-ref-row">
             <input
@@ -234,10 +251,12 @@ function NodeInspector({
 
 function EdgeInspector({
   edge,
+  validationErrors,
   onUpdateEdge,
 }: Props & { edge: LoomEdge }) {
   const update = (updater: (e: LoomEdge) => LoomEdge) =>
     onUpdateEdge(edge.id, updater);
+  const errors = errorsForEdge(validationErrors, edge.id);
 
   return (
     <div className="inspector">
@@ -253,6 +272,7 @@ function EdgeInspector({
         <div className="field-value">
           <code>{edge.from}</code> → <code>{edge.to}</code>
         </div>
+        <FieldError message={errors.from ?? errors.to} />
       </div>
 
       <div className="field">
@@ -270,6 +290,7 @@ function EdgeInspector({
             </option>
           ))}
         </select>
+        <FieldError message={errors.kind} />
       </div>
 
       <div className="field">
@@ -281,6 +302,7 @@ function EdgeInspector({
             update((g) => ({ ...g, label: e.target.value || undefined }))
           }
         />
+        <FieldError message={errors.label} />
       </div>
 
       <div className="field">

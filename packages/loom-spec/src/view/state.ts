@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoomDiagram, Node as LoomNode, Edge as LoomEdge } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
 import { loadDiagram, saveDiagram } from "./loadDiagram";
+import { validateDiagramClient, type ValidationError } from "./validate-client";
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
@@ -13,6 +14,7 @@ interface DiagramState {
   saveStatus: SaveStatus;
   saveError: string | null;
   connectionStatus: ConnectionStatus;
+  validationErrors: ValidationError[];
 }
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -25,6 +27,7 @@ export function useDiagramState(id: string) {
     saveStatus: "idle",
     saveError: null,
     connectionStatus: "connecting",
+    validationErrors: [],
   });
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,6 +48,7 @@ export function useDiagramState(id: string) {
           ...s,
           diagram: spec.diagram,
           nodeTypes: spec.nodeTypes,
+          validationErrors: validateDiagramClient(spec.diagram),
         }));
       })
       .catch((e: unknown) => {
@@ -88,7 +92,11 @@ export function useDiagramState(id: string) {
         if (!s.diagram) return s;
         const next = updater(s.diagram);
         latestDiagram.current = next;
-        return { ...s, diagram: next };
+        return {
+          ...s,
+          diagram: next,
+          validationErrors: validateDiagramClient(next),
+        };
       });
       scheduleSave();
     },
@@ -173,6 +181,7 @@ export function useDiagramState(id: string) {
             nodeTypes: spec.nodeTypes,
             saveStatus: "idle",
             saveError: null,
+            validationErrors: validateDiagramClient(spec.diagram),
           }));
         })
         .catch(() => {

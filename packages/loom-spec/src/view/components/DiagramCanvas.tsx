@@ -49,6 +49,12 @@ function stripPort(handle: string): string {
   return i === -1 ? handle : handle.slice(0, i);
 }
 
+function splitHandle(handle: string): { node: string; port: string | null } {
+  const i = handle.indexOf(":");
+  if (i === -1) return { node: handle, port: null };
+  return { node: handle.slice(0, i), port: handle.slice(i + 1) };
+}
+
 export function DiagramCanvas({
   diagram,
   nodeTypesConfig,
@@ -117,11 +123,15 @@ export function DiagramCanvas({
       // Centered offset: for 2 → [-1, +1]; for 3 → [-1, 0, +1]; for 4 → [-1.5, -0.5, 0.5, 1.5]
       const offsetIndex = count === 1 ? 0 : indexInGroup - (count - 1) / 2;
       const isParallel = count > 1;
+      const from = splitHandle(e.from);
+      const to = splitHandle(e.to);
 
       return {
         id: e.id,
-        source: stripPort(e.from),
-        target: stripPort(e.to),
+        source: from.node,
+        target: to.node,
+        sourceHandle: from.port,
+        targetHandle: to.port,
         type: isParallel ? "parallel" : undefined,
         label: e.label,
         selected: selection?.kind === "edge" && selection.id === e.id,
@@ -166,10 +176,12 @@ export function DiagramCanvas({
   const onConnect: OnConnect = useCallback(
     (conn) => {
       if (!conn.source || !conn.target) return;
+      const from = conn.sourceHandle ? `${conn.source}:${conn.sourceHandle}` : conn.source;
+      const to = conn.targetHandle ? `${conn.target}:${conn.targetHandle}` : conn.target;
       onAddEdge({
         id: uniqueEdgeId(diagram),
-        from: conn.source,
-        to: conn.target,
+        from,
+        to,
         kind: "request",
       });
     },
