@@ -1,0 +1,56 @@
+{
+  "types": {
+    "ui": {
+      "label": "UI Component",
+      "description": "User-facing component (page, view, widget).",
+      "color": "#60a5fa",
+      "icon": "monitor",
+      "fields": [
+        { "name": "framework", "type": "string", "required": false }
+      ]
+    },
+    "service": {
+      "label": "Service",
+      "description": "Backend service, API, or business-logic module.",
+      "color": "#34d399",
+      "icon": "server",
+      "fields": [
+        { "name": "language", "type": "string", "required": false },
+        { "name": "runtime", "type": "string", "required": false }
+      ]
+    },
+    "data": {
+      "label": "Data Store",
+      "description": "Persistent or cached data location.",
+      "color": "#a78bfa",
+      "icon": "database",
+      "fields": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "values": ["postgres", "mysql", "sqlite", "redis", "s3", "file", "memory"],
+          "required": false
+        },
+        { "name": "ttl_seconds", "type": "number", "required": false }
+      ]
+    },
+    "event": {
+      "label": "Event",
+      "description": "Asynchronous message or domain event.",
+      "color": "#fbbf24",
+      "icon": "zap",
+      "fields": [
+        { "name": "channel", "type": "string", "required": false }
+      ]
+    },
+    "external": {
+      "label": "External System",
+      "description": "Third-party service or system outside this codebase.",
+      "color": "#94a3b8",
+      "icon": "globe",
+      "fields": [
+        { "name": "url", "type": "string", "required": false }
+      ]
+    }
+  }
+}

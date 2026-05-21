@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loom-spec.dev/schema/node-types-v1.json",
+  "title": "Loom Node Types",
+  "description": "Defines the node type vocabulary for a project.",
+  "type": "object",
+  "required": ["types"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "types": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/NodeType" },
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" }
+    }
+  },
+
+  "$defs": {
+    "NodeType": {
+      "type": "object",
+      "required": ["label", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Lucide icon name."
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Field" },
+          "default": []
+        },
+        "ports": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "in": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Port" },
+              "default": []
+            },
+            "out": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Port" },
+              "default": []
+            }
+          }
+        }
+      }
+    },
+
+    "Field": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "enum", "markdown", "code-ref", "array"]
+        },
+        "required": { "type": "boolean", "default": false },
+        "description": { "type": "string" },
+        "default": {},
+        "values": {
+          "type": "array",
+          "description": "Required when type is 'enum'."
+        },
+        "items": {
+          "type": "string",
+          "enum": ["string", "number"],
+          "description": "Required when type is 'array'."
+        },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "pattern": { "type": "string" },
+        "max_length": { "type": "number", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
+          "then": { "required": ["values"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "array" } }, "required": ["type"] },
+          "then": { "required": ["items"] }
+        }
+      ]
+    },
+
+    "Port": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$"
+        },
+        "signal": {
+          "type": "string",
+          "description": "Free-form signal type tag, e.g. 'audio', 'midi', 'http', 'control'."
+        }
+      }
+    }
+  }
+}

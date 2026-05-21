@@ -1,0 +1,38 @@
+{
+  "name": "loom-spec",
+  "version": "0.0.1",
+  "description": "Node-based architecture spec that lives in your repo. AI-readable, AI-writable.",
+  "type": "module",
+  "bin": {
+    "loom-spec": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "schema"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./schema": "./schema/diagram.schema.json",
+    "./node-types-schema": "./schema/node-types.schema.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts",
+    "dev": "tsx src/cli/index.ts view --dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "generate-types": "tsx scripts/generate-types.ts",
+    "validate-examples": "tsx scripts/validate-examples.ts"
+  },
+  "keywords": ["architecture", "diagram", "node-based", "spec", "ai", "agent"],
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.10.0"
+  }
+}

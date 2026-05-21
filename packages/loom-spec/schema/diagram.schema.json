@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loom-spec.dev/schema/diagram-v1.json",
+  "title": "Loom Diagram",
+  "description": "A node-based architecture spec file.",
+  "type": "object",
+  "required": ["version", "id", "title", "nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Diagram identifier. Should match the filename without extension."
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Node" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Edge" }
+    },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Group" },
+      "default": []
+    }
+  },
+
+  "$defs": {
+    "Node": {
+      "type": "object",
+      "required": ["id", "type", "label", "position", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Unique within this diagram."
+        },
+        "type": {
+          "type": "string",
+          "description": "References a key in node-types.json."
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "description": {
+          "type": "string",
+          "description": "Markdown allowed."
+        },
+        "position": {
+          "type": "object",
+          "required": ["x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "implemented", "stale", "deprecated"],
+          "description": "planned = spec exists, code does not. implemented = both present. stale = code refs are broken, needs review. deprecated = kept for history, no longer active."
+        },
+        "code_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CodeRef" },
+          "default": []
+        },
+        "properties": {
+          "type": "object",
+          "description": "Custom fields defined by the node's type in node-types.json.",
+          "default": {}
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "drill_down": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "ID of another diagram file to navigate into when this node is opened."
+        }
+      }
+    },
+
+    "Edge": {
+      "type": "object",
+      "required": ["id", "from", "to", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(:[a-z0-9_-]+)?$",
+          "description": "Source node id, optionally with :port-name suffix."
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(:[a-z0-9_-]+)?$",
+          "description": "Target node id, optionally with :port-name suffix."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["request", "event", "data-read", "data-write", "signal", "dependency", "control"]
+        },
+        "label": { "type": "string", "maxLength": 60 },
+        "description": { "type": "string" },
+        "direction": {
+          "type": "string",
+          "enum": ["forward", "bidirectional"],
+          "default": "forward"
+        }
+      }
+    },
+
+    "Group": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Node ids contained in this group.",
+          "default": []
+        },
+        "subgroups": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Group ids nested inside this group.",
+          "default": []
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "collapsed": { "type": "boolean", "default": false },
+        "drill_down": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        }
+      }
+    },
+
+    "CodeRef": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Repo-relative file path."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Function, class, or component name. Preferred over lines because it survives refactors."
+        },
+        "lines": {
+          "type": "string",
+          "pattern": "^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$",
+          "description": "Line range(s) like '1-80' or '12,45-50'. Use only when no symbol applies."
+        }
+      }
+    }
+  }
+}

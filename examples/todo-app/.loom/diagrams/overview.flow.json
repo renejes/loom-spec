@@ -1,0 +1,110 @@
+{
+  "version": "1",
+  "id": "overview",
+  "title": "Todo App — Overview",
+  "description": "End-to-end signal flow from UI to storage, plus a planned completion celebration.",
+  "nodes": [
+    {
+      "id": "todo-list-view",
+      "type": "ui",
+      "label": "Todo List View",
+      "description": "Renders todos, dispatches actions on toggle/delete.",
+      "position": { "x": 80, "y": 160 },
+      "status": "implemented",
+      "code_refs": [
+        { "path": "src/views/TodoList.tsx", "symbol": "TodoList" }
+      ],
+      "properties": { "framework": "react" },
+      "tags": ["public", "critical-path"]
+    },
+    {
+      "id": "todo-api",
+      "type": "service",
+      "label": "Todo API",
+      "description": "REST endpoints: GET /todos, POST /todos, PATCH /todos/:id, DELETE /todos/:id.",
+      "position": { "x": 400, "y": 160 },
+      "status": "implemented",
+      "code_refs": [
+        { "path": "src/server/routes/todos.ts", "symbol": "todoRouter" }
+      ],
+      "properties": { "language": "typescript", "runtime": "node" }
+    },
+    {
+      "id": "todo-store",
+      "type": "data",
+      "label": "Todo Store",
+      "description": "Persistent todos, one row per todo.",
+      "position": { "x": 720, "y": 160 },
+      "status": "implemented",
+      "code_refs": [
+        { "path": "src/server/db/todos.ts", "symbol": "todosTable" }
+      ],
+      "properties": { "engine": "postgres" }
+    },
+    {
+      "id": "todo-completed-event",
+      "type": "event",
+      "label": "Todo Completed",
+      "description": "Emitted when a todo flips to done — feeds the celebration UI.",
+      "position": { "x": 400, "y": 360 },
+      "status": "planned",
+      "code_refs": [],
+      "properties": { "channel": "ui-events" }
+    },
+    {
+      "id": "confetti",
+      "type": "ui",
+      "label": "Confetti Burst",
+      "description": "Visual celebration on completion.",
+      "position": { "x": 720, "y": 360 },
+      "status": "planned",
+      "code_refs": [],
+      "properties": { "framework": "react" }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "todo-list-view",
+      "to": "todo-api",
+      "kind": "request",
+      "label": "fetch / mutate"
+    },
+    {
+      "id": "e2",
+      "from": "todo-api",
+      "to": "todo-store",
+      "kind": "data-write",
+      "label": "INSERT / UPDATE"
+    },
+    {
+      "id": "e3",
+      "from": "todo-api",
+      "to": "todo-store",
+      "kind": "data-read",
+      "label": "SELECT"
+    },
+    {
+      "id": "e4",
+      "from": "todo-list-view",
+      "to": "todo-completed-event",
+      "kind": "event",
+      "label": "emit on toggle"
+    },
+    {
+      "id": "e5",
+      "from": "todo-completed-event",
+      "to": "confetti",
+      "kind": "event",
+      "label": "trigger animation"
+    }
+  ],
+  "groups": [
+    {
+      "id": "celebration",
+      "label": "Celebration (planned)",
+      "children": ["todo-completed-event", "confetti"],
+      "color": "#fef3c7"
+    }
+  ]
+}
