@@ -12,6 +12,7 @@ import {
 } from "@xyflow/react";
 import { NodeCard, type NodeCardData } from "./NodeCard";
 import { GroupNode, type GroupNodeData } from "./GroupNode";
+import { ParallelEdge } from "./ParallelEdge";
 import type { LoomDiagram, Edge as LoomEdge } from "../../types/diagram";
 import type { LoomNodeTypes } from "../../types/node-types";
 import type { Selection } from "../App";
@@ -29,6 +30,7 @@ const EDGE_COLOR: Record<LoomEdge["kind"], string> = {
 };
 
 const nodeTypes = { loom: NodeCard, loomGroup: GroupNode };
+const edgeTypes = { parallel: ParallelEdge };
 
 interface Props {
   diagram: LoomDiagram;
@@ -97,12 +99,30 @@ export function DiagramCanvas({
     return [...groupNodes, ...itemNodes];
   }, [diagram, nodeTypesConfig, selection, onDrillDown]);
 
-  const flowEdges: FlowEdge[] = useMemo(
-    () =>
-      diagram.edges.map((e) => ({
+  const flowEdges: FlowEdge[] = useMemo(() => {
+    // Group edges by source→target so parallels share an offset axis.
+    const groups = new Map<string, LoomEdge[]>();
+    for (const e of diagram.edges) {
+      const key = `${stripPort(e.from)}::${stripPort(e.to)}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(e);
+      else groups.set(key, [e]);
+    }
+
+    return diagram.edges.map((e) => {
+      const key = `${stripPort(e.from)}::${stripPort(e.to)}`;
+      const siblings = groups.get(key)!;
+      const indexInGroup = siblings.findIndex((s) => s.id === e.id);
+      const count = siblings.length;
+      // Centered offset: for 2 → [-1, +1]; for 3 → [-1, 0, +1]; for 4 → [-1.5, -0.5, 0.5, 1.5]
+      const offsetIndex = count === 1 ? 0 : indexInGroup - (count - 1) / 2;
+      const isParallel = count > 1;
+
+      return {
         id: e.id,
         source: stripPort(e.from),
         target: stripPort(e.to),
+        type: isParallel ? "parallel" : undefined,
         label: e.label,
         selected: selection?.kind === "edge" && selection.id === e.id,
         style: { stroke: EDGE_COLOR[e.kind], strokeWidth: 1.5 },
@@ -111,9 +131,10 @@ export function DiagramCanvas({
         labelBgPadding: [4, 2] as [number, number],
         labelBgBorderRadius: 3,
         animated: e.kind === "event" || e.kind === "signal",
-      })),
-    [diagram, selection]
-  );
+        data: isParallel ? { parallelOffset: offsetIndex } : undefined,
+      };
+    });
+  }, [diagram, selection]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -174,6 +195,7 @@ export function DiagramCanvas({
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

@@ -4,6 +4,7 @@ import type { LoomNodeTypes } from "../types/node-types";
 import { loadDiagram, saveDiagram } from "./loadDiagram";
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
 interface DiagramState {
   diagram: LoomDiagram | null;
@@ -11,6 +12,7 @@ interface DiagramState {
   loadError: string | null;
   saveStatus: SaveStatus;
   saveError: string | null;
+  connectionStatus: ConnectionStatus;
 }
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -22,6 +24,7 @@ export function useDiagramState(id: string) {
     loadError: null,
     saveStatus: "idle",
     saveError: null,
+    connectionStatus: "connecting",
   });
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,6 +157,7 @@ export function useDiagramState(id: string) {
   // Subscribe to server-sent events for live updates from other writers
   // (e.g. an AI agent editing the JSON while the UI is open).
   useEffect(() => {
+    setState((s) => ({ ...s, connectionStatus: "connecting" }));
     const es = new EventSource("/api/events");
 
     const refetchDiagram = () => {
@@ -174,6 +178,16 @@ export function useDiagramState(id: string) {
         .catch(() => {
           // Keep existing state on failure; user can manually reload.
         });
+    };
+
+    es.onopen = () => {
+      setState((s) => ({ ...s, connectionStatus: "connected" }));
+    };
+    es.onerror = () => {
+      // EventSource auto-reconnects with its own backoff; we just expose
+      // the current state. If the browser drops back to CONNECTING, the
+      // status will flip back to "connected" on the next open.
+      setState((s) => ({ ...s, connectionStatus: "disconnected" }));
     };
 
     es.addEventListener("change", (evt) => {

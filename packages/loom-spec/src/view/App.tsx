@@ -129,6 +129,7 @@ export function App() {
         diagrams={diagrams}
         saveStatus={state.saveStatus}
         saveError={state.saveError}
+        connectionStatus={state.connectionStatus}
         onClickAdd={() => setAddMenuOpen((v) => !v)}
         addMenuOpen={addMenuOpen}
         isDefault={isDefault}

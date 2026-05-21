@@ -1,6 +1,6 @@
-import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft } from "lucide-react";
+import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft, Wifi, WifiOff } from "lucide-react";
 import { useTheme } from "../theme";
-import type { SaveStatus } from "../state";
+import type { SaveStatus, ConnectionStatus } from "../state";
 import { DiagramSwitcher } from "./DiagramSwitcher";
 import type { DiagramSummary } from "../loadDiagram";
 
@@ -11,6 +11,7 @@ interface Props {
   diagrams: DiagramSummary[];
   saveStatus: SaveStatus;
   saveError: string | null;
+  connectionStatus: ConnectionStatus;
   onClickAdd: () => void;
   addMenuOpen: boolean;
   isDefault: boolean;
@@ -18,6 +19,40 @@ interface Props {
   onNavigate: (id: string) => void;
   onCreateDiagram: () => void;
   addButtonRef: React.RefObject<HTMLButtonElement>;
+}
+
+function ConnectionDot({ status }: { status: ConnectionStatus }) {
+  if (status === "connected") {
+    return (
+      <span
+        className="conn-dot connected"
+        title="Live sync connected"
+        aria-label="Live sync connected"
+      >
+        <Wifi size={12} />
+      </span>
+    );
+  }
+  if (status === "connecting") {
+    return (
+      <span
+        className="conn-dot connecting"
+        title="Connecting to live sync…"
+        aria-label="Connecting"
+      >
+        <Loader2 size={12} className="spin" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="conn-dot disconnected"
+      title="Live sync disconnected — reconnecting in the background"
+      aria-label="Disconnected"
+    >
+      <WifiOff size={12} />
+    </span>
+  );
 }
 
 function SaveIndicator({
@@ -62,6 +97,7 @@ export function TopBar({
   diagrams,
   saveStatus,
   saveError,
+  connectionStatus,
   onClickAdd,
   addMenuOpen,
   isDefault,
@@ -91,6 +127,7 @@ export function TopBar({
         onCreate={onCreateDiagram}
       />
       {subtitle && <div className="subtitle">{subtitle}</div>}
+      <ConnectionDot status={connectionStatus} />
       <SaveIndicator status={saveStatus} error={saveError} />
       <button
         ref={addButtonRef}

@@ -1,6 +1,9 @@
+import { useState } from "react";
+import { X, Plus } from "lucide-react";
 import type {
   Node as LoomNode,
   Edge as LoomEdge,
+  CodeRef,
 } from "../../types/diagram";
 import type { LoomNodeTypes, Field, NodeType } from "../../types/node-types";
 
@@ -59,6 +62,7 @@ function NodeInspector({
   const typeColor = typeDef?.color ?? "#71717a";
   const properties = node.properties ?? {};
   const codeRefs = node.code_refs ?? [];
+  const tags = node.tags ?? [];
 
   const update = (updater: (n: LoomNode) => LoomNode) =>
     onUpdateNode(node.id, updater);
@@ -147,21 +151,82 @@ function NodeInspector({
 
       <div className="field">
         <div className="field-label">Code refs</div>
-        {codeRefs.length === 0 ? (
-          <div className="field-value muted">none yet</div>
-        ) : (
-          codeRefs.map((ref, i) => (
-            <div key={i} className="code-ref">
-              {ref.path}
-              {ref.symbol && (
-                <span style={{ color: "var(--text-muted)" }}> · {ref.symbol}</span>
-              )}
-              {ref.lines && (
-                <span style={{ color: "var(--text-muted)" }}> · L{ref.lines}</span>
-              )}
-            </div>
-          ))
-        )}
+        {codeRefs.map((ref, i) => (
+          <div key={i} className="code-ref-row">
+            <input
+              className="input"
+              value={ref.path}
+              placeholder="src/path/to/file.ts"
+              onChange={(e) =>
+                update((n) => {
+                  const next = [...(n.code_refs ?? [])];
+                  next[i] = { ...next[i], path: e.target.value } as CodeRef;
+                  return { ...n, code_refs: next };
+                })
+              }
+            />
+            <input
+              className="input small"
+              value={ref.symbol ?? ""}
+              placeholder="symbol"
+              onChange={(e) =>
+                update((n) => {
+                  const next = [...(n.code_refs ?? [])];
+                  next[i] = { ...next[i], symbol: e.target.value || undefined } as CodeRef;
+                  return { ...n, code_refs: next };
+                })
+              }
+            />
+            <input
+              className="input small"
+              value={ref.lines ?? ""}
+              placeholder="lines"
+              onChange={(e) =>
+                update((n) => {
+                  const next = [...(n.code_refs ?? [])];
+                  next[i] = { ...next[i], lines: e.target.value || undefined } as CodeRef;
+                  return { ...n, code_refs: next };
+                })
+              }
+            />
+            <button
+              type="button"
+              className="row-delete"
+              title="Remove ref"
+              aria-label="Remove ref"
+              onClick={() =>
+                update((n) => ({
+                  ...n,
+                  code_refs: (n.code_refs ?? []).filter((_, j) => j !== i),
+                }))
+              }
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="add-row"
+          onClick={() =>
+            update((n) => ({
+              ...n,
+              code_refs: [...(n.code_refs ?? []), { path: "" }],
+            }))
+          }
+        >
+          <Plus size={12} /> Add code ref
+        </button>
+      </div>
+
+      <div className="field">
+        <div className="field-label">Tags</div>
+        <TagInput
+          value={tags}
+          onChange={(next) =>
+            update((n) => ({ ...n, tags: next.length > 0 ? next : undefined }))
+          }
+        />
       </div>
     </div>
   );
@@ -229,6 +294,59 @@ function EdgeInspector({
           }
         />
       </div>
+    </div>
+  );
+}
+
+function TagInput({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const commit = () => {
+    const t = draft.trim().toLowerCase();
+    setDraft("");
+    if (!t) return;
+    if (value.includes(t)) return;
+    onChange([...value, t]);
+  };
+
+  return (
+    <div className="tag-input">
+      <div className="tag-chips">
+        {value.map((t) => (
+          <span key={t} className="tag">
+            {t}
+            <button
+              type="button"
+              className="tag-x"
+              aria-label={`Remove tag ${t}`}
+              onClick={() => onChange(value.filter((x) => x !== t))}
+            >
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        className="input"
+        value={draft}
+        placeholder="Add tag and press Enter"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Backspace" && draft === "" && value.length > 0) {
+            onChange(value.slice(0, -1));
+          }
+        }}
+        onBlur={commit}
+      />
     </div>
   );
 }

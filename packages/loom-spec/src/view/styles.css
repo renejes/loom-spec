@@ -186,15 +186,85 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   word-break: break-all;
 }
 .inspector .tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
-  padding: 2px 6px;
+  padding: 2px 4px 2px 6px;
   background: var(--bg-canvas);
   border: 1px solid var(--border);
   border-radius: 3px;
   margin-right: 4px;
   margin-bottom: 4px;
+  color: var(--text);
 }
+.inspector .tag-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.inspector .tag-x:hover {
+  color: var(--status-stale);
+}
+
+.code-ref-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 60px 22px;
+  gap: 4px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.code-ref-row .input.small {
+  padding: 4px 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+.code-ref-row .input {
+  padding: 4px 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+.row-delete {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.row-delete:hover {
+  color: var(--status-stale);
+  border-color: var(--status-stale);
+}
+.add-row {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.add-row:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.tag-input { }
+.tag-chips { margin-bottom: 6px; min-height: 1px; }
 
 /* ─── Form inputs (Inspector) ───────────────────────────────── */
 .input {
@@ -239,6 +309,18 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .save-indicator.saving  { color: var(--accent);     background: color-mix(in oklab, var(--accent) 15%, transparent); }
 .save-indicator.saved   { color: var(--status-implemented); background: color-mix(in oklab, var(--status-implemented) 15%, transparent); }
 .save-indicator.error   { color: var(--status-stale); background: color-mix(in oklab, var(--status-stale) 15%, transparent); }
+
+.conn-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+.conn-dot.connected { color: var(--status-implemented); }
+.conn-dot.connecting { color: var(--text-muted); }
+.conn-dot.disconnected { color: var(--status-stale); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
