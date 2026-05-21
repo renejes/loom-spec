@@ -6,6 +6,17 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "loom-spec", "dev"],
       "port": 7777
+    },
+    {
+      "name": "loom-spec-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "packages/loom-spec/dist/cli/index.js",
+        "view",
+        "--root",
+        "examples/todo-app"
+      ],
+      "port": 7777
     }
   ]
 }
