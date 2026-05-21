@@ -145,7 +145,8 @@
         "todo-completed-event",
         "confetti"
       ],
-      "color": "#fef3c7"
+      "color": "#fef3c7",
+      "drill_down": "celebration-detail"
     }
   ]
 }

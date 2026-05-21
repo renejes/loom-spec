@@ -39,6 +39,7 @@ interface Props {
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
   onAddEdge: (edge: LoomEdge) => void;
+  onDrillDown: (id: string) => void;
 }
 
 function stripPort(handle: string): string {
@@ -55,6 +56,7 @@ export function DiagramCanvas({
   onDeleteNode,
   onDeleteEdge,
   onAddEdge,
+  onDrillDown,
 }: Props) {
   const flowNodes: FlowNode<NodeCardData | GroupNodeData>[] = useMemo(() => {
     // Group frames render first (lower z-index) so children sit on top.
@@ -75,7 +77,7 @@ export function DiagramCanvas({
           selectable: false,
           focusable: false,
           deletable: false,
-          data: { group: g },
+          data: { group: g, onDrillDown },
         },
       ];
     });
@@ -88,11 +90,12 @@ export function DiagramCanvas({
       data: {
         node: n,
         typeDef: nodeTypesConfig.types[n.type],
+        onDrillDown,
       },
     }));
 
     return [...groupNodes, ...itemNodes];
-  }, [diagram, nodeTypesConfig, selection]);
+  }, [diagram, nodeTypesConfig, selection, onDrillDown]);
 
   const flowEdges: FlowEdge[] = useMemo(
     () =>
@@ -175,6 +178,11 @@ export function DiagramCanvas({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
+        onNodeDoubleClick={(_, node) => {
+          // Power-user shortcut: dbl-click a node with drill_down to navigate.
+          const data = node.data as NodeCardData & { onDrillDown?: (id: string) => void };
+          if (data.node?.drill_down) onDrillDown(data.node.drill_down);
+        }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         proOptions={{ hideAttribution: true }}

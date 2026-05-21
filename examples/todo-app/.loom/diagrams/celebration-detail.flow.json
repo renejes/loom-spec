@@ -1,0 +1,55 @@
+{
+  "version": "1",
+  "id": "celebration-detail",
+  "title": "Celebration (planned details)",
+  "description": "Implementation plan for the completion celebration UI.",
+  "nodes": [
+    {
+      "id": "completed-listener",
+      "type": "service",
+      "label": "Completion Listener",
+      "description": "Subscribes to the todo-completed event channel and dispatches a burst.",
+      "position": { "x": 100, "y": 220 },
+      "status": "planned",
+      "code_refs": [],
+      "properties": { "language": "typescript", "runtime": "browser" }
+    },
+    {
+      "id": "confetti-lib",
+      "type": "external",
+      "label": "canvas-confetti",
+      "description": "Third-party confetti animation library.",
+      "position": { "x": 460, "y": 120 },
+      "status": "planned",
+      "code_refs": [],
+      "properties": { "url": "https://www.npmjs.com/package/canvas-confetti" }
+    },
+    {
+      "id": "burst-component",
+      "type": "ui",
+      "label": "Burst Component",
+      "description": "Renders the confetti animation overlay for ~2 seconds.",
+      "position": { "x": 460, "y": 320 },
+      "status": "planned",
+      "code_refs": [],
+      "properties": { "framework": "react" }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "completed-listener",
+      "to": "burst-component",
+      "kind": "control",
+      "label": "trigger"
+    },
+    {
+      "id": "e2",
+      "from": "burst-component",
+      "to": "confetti-lib",
+      "kind": "dependency",
+      "label": "uses"
+    }
+  ],
+  "groups": []
+}

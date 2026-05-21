@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
   Monitor, Server, Database, Zap, Globe,
-  Box, Music, Sliders,
+  Box, Music, Sliders, CornerDownRight,
   type LucideIcon,
 } from "lucide-react";
 import type { Node as LoomNode } from "../../types/diagram";
@@ -27,10 +27,11 @@ const STATUS_COLOR: Record<LoomNode["status"], string> = {
 export interface NodeCardData extends Record<string, unknown> {
   node: LoomNode;
   typeDef: NodeType | undefined;
+  onDrillDown?: (id: string) => void;
 }
 
 export function NodeCard({ data }: NodeProps) {
-  const { node, typeDef } = data as NodeCardData;
+  const { node, typeDef, onDrillDown } = data as NodeCardData;
   const color = typeDef?.color ?? "#71717a";
   const Icon = typeDef?.icon ? (ICONS[typeDef.icon] ?? Box) : Box;
   const typeLabel = typeDef?.label ?? node.type;
@@ -50,6 +51,20 @@ export function NodeCard({ data }: NodeProps) {
       </div>
       <div className="node-label">{node.label}</div>
       <span className="status-dot" title={node.status} />
+      {node.drill_down && onDrillDown && (
+        <button
+          className="drill-down-btn"
+          title={`Drill into ${node.drill_down}`}
+          aria-label={`Drill into ${node.drill_down}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDrillDown(node.drill_down!);
+          }}
+        >
+          <CornerDownRight size={12} />
+        </button>
+      )}
       <Handle type="source" position={Position.Right} />
     </div>
   );

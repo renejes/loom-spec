@@ -109,6 +109,18 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   text-overflow: ellipsis;
   flex-shrink: 0;
 }
+.breadcrumb-back {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 4px 8px 4px 4px;
+  font-size: 13px;
+}
+.breadcrumb-back:hover {
+  background: var(--bg-canvas);
+  border-color: var(--border);
+  color: var(--text);
+}
 .topbar .subtitle {
   color: var(--text-muted);
   font-size: 13px;
@@ -323,6 +335,40 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   height: 8px;
   border-radius: 50%;
   background: var(--status-color, var(--text-subtle));
+}
+
+.drill-down-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-canvas);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.1s, color 0.1s, border-color 0.1s;
+}
+.drill-down-btn:hover {
+  background: var(--node-color, var(--accent));
+  color: var(--accent-fg);
+  border-color: var(--node-color, var(--accent));
+}
+.drill-down-btn.inline {
+  position: static;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.drill-down-btn.inline:hover {
+  background: var(--group-color, var(--accent));
+  border-color: var(--group-color, var(--accent));
 }
 
 /* ─── Group frame ──────────────────────────────────────────────── */

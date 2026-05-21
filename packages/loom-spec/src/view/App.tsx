@@ -4,6 +4,7 @@ import { DiagramCanvas } from "./components/DiagramCanvas";
 import { Inspector } from "./components/Inspector";
 import { AddNodeMenu } from "./components/AddNodeMenu";
 import { useDiagramState, uniqueNodeId } from "./state";
+import { useDiagramId } from "./useDiagramId";
 import type { Node as LoomNode } from "../types/diagram";
 
 export type Selection =
@@ -12,9 +13,21 @@ export type Selection =
   | null;
 
 export function App() {
-  const state = useDiagramState("overview");
+  const { id: diagramId, navigate, isDefault } = useDiagramId();
+  const state = useDiagramState(diagramId);
   const [selection, setSelection] = useState<Selection>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  // Reset selection whenever we switch diagrams so the inspector doesn't
+  // hold onto an id that no longer exists.
+  const navigateAndReset = useCallback(
+    (id: string) => {
+      setSelection(null);
+      setAddMenuOpen(false);
+      navigate(id);
+    },
+    [navigate]
+  );
 
   const handleAddNode = useCallback(
     (typeKey: string) => {
@@ -80,6 +93,8 @@ export function App() {
         saveError={state.saveError}
         onClickAdd={() => setAddMenuOpen((v) => !v)}
         addMenuOpen={addMenuOpen}
+        isDefault={isDefault}
+        onClickHome={() => navigateAndReset("overview")}
       />
       {addMenuOpen && (
         <AddNodeMenu
@@ -105,6 +120,7 @@ export function App() {
           if (selection?.kind === "edge" && selection.id === id) setSelection(null);
         }}
         onAddEdge={state.addEdge}
+        onDrillDown={navigateAndReset}
       />
       <Inspector
         selectedNode={selectedNode}

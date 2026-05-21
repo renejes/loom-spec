@@ -1,4 +1,4 @@
-import { Moon, Sun, Plus, Check, Loader2, AlertCircle } from "lucide-react";
+import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft } from "lucide-react";
 import { useTheme } from "../theme";
 import type { SaveStatus } from "../state";
 
@@ -9,6 +9,8 @@ interface Props {
   saveError: string | null;
   onClickAdd: () => void;
   addMenuOpen: boolean;
+  isDefault: boolean;
+  onClickHome: () => void;
 }
 
 function SaveIndicator({
@@ -53,10 +55,22 @@ export function TopBar({
   saveError,
   onClickAdd,
   addMenuOpen,
+  isDefault,
+  onClickHome,
 }: Props) {
   const { theme, toggleTheme } = useTheme();
   return (
     <div className="topbar">
+      {!isDefault && (
+        <button
+          className="breadcrumb-back"
+          onClick={onClickHome}
+          title="Back to overview"
+          aria-label="Back to overview"
+        >
+          <ChevronLeft size={14} /> Overview
+        </button>
+      )}
       <div className="title">{title}</div>
       {subtitle && <div className="subtitle">{subtitle}</div>}
       <SaveIndicator status={saveStatus} error={saveError} />
