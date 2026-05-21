@@ -56,6 +56,35 @@ export interface TimelineEvent {
    * Optional category for clip styling. Distinct from edge.kind in the diagram — this describes what the node is doing during this clip, not what flows between nodes.
    */
   kind?: "compute" | "io" | "wait" | "error";
+  /**
+   * Optional anchors to the specific function(s) running during this clip. Like node-level code_refs but scoped to a moment in time. Drift detection checks these too. Use for function-level granularity inside a node (e.g. 'validate' vs. 'issue jwt' both happen on the auth-service node).
+   */
+  code_refs?: CodeRef[];
+  /**
+   * Optional id of another event that caused this one. Used for explicit causation chains and to preserve OTel span.parent_id when importing traces. The renderer can draw a connecting arrow between the two clips.
+   */
+  triggered_by?: string;
+  /**
+   * Free-form labels for filtering or grouping clips. Examples: 'critical-path', 'billable-time', 'background'.
+   */
+  tags?: string[];
+}
+/**
+ * Same shape as the CodeRef in diagram.schema.json. Inlined here to keep the schema self-contained — no cross-file $ref required to validate.
+ */
+export interface CodeRef {
+  /**
+   * Repo-relative file path.
+   */
+  path: string;
+  /**
+   * Function, class, or component name. Preferred over lines because it survives refactors.
+   */
+  symbol?: string;
+  /**
+   * Line range(s) like '1-80' or '12,45-50'. Use only when no symbol applies.
+   */
+  lines?: string;
 }
 export interface TimelineTrack {
   /**
