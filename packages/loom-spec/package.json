@@ -18,21 +18,29 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts",
-    "dev": "tsx src/cli/index.ts view --dev",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev:view": "vite --config src/view/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/view/tsconfig.json --noEmit",
     "generate-types": "tsx scripts/generate-types.ts",
     "validate-examples": "tsx scripts/validate-examples.ts"
   },
   "keywords": ["architecture", "diagram", "node-based", "spec", "ai", "agent"],
   "license": "MIT",
   "dependencies": {
+    "@xyflow/react": "^12.3.5",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "json-schema-to-typescript": "^15.0.3",
     "tsx": "^4.19.2",
     "typescript": "^5.6.0",
-    "@types/node": "^22.10.0"
+    "vite": "^5.4.11"
   }
 }

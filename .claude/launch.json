@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "loom-spec-view",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "loom-spec", "dev:view"],
+      "port": 7777
+    }
+  ]
+}
