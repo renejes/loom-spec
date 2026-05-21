@@ -1,15 +1,45 @@
 {
   "name": "loom-spec",
   "version": "0.0.1",
-  "description": "Node-based architecture spec that lives in your repo. AI-readable, AI-writable.",
+  "description": "Node-based architecture spec that lives in your repo. AI-readable, AI-writable, git-diffable.",
   "type": "module",
+  "author": "René Jesser",
+  "license": "MIT",
+  "homepage": "https://github.com/renejes/loom-spec#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/renejes/loom-spec.git",
+    "directory": "packages/loom-spec"
+  },
+  "bugs": {
+    "url": "https://github.com/renejes/loom-spec/issues"
+  },
+  "keywords": [
+    "architecture",
+    "architecture-as-code",
+    "diagram",
+    "node-based",
+    "spec",
+    "specification",
+    "visual-programming",
+    "flow-chart",
+    "ai",
+    "ai-agent",
+    "claude",
+    "agent-skills",
+    "react-flow",
+    "xyflow",
+    "developer-tools"
+  ],
   "bin": {
     "loom-spec": "./dist/cli/index.js"
   },
   "files": [
     "dist",
     "templates",
-    "schema"
+    "schema",
+    "README.md",
+    "LICENSE"
   ],
   "exports": {
     ".": "./dist/index.js",
@@ -26,8 +56,6 @@
     "generate-types": "tsx scripts/generate-types.ts",
     "validate-examples": "tsx scripts/validate-examples.ts"
   },
-  "keywords": ["architecture", "diagram", "node-based", "spec", "ai", "agent"],
-  "license": "MIT",
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@xyflow/react": "^12.3.5",
