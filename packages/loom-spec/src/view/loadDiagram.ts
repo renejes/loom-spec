@@ -1,5 +1,6 @@
 import type { LoomDiagram } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
+import type { LoomTimeline } from "../types/timeline";
 
 export interface LoadedSpec {
   diagram: LoomDiagram;
@@ -64,4 +65,37 @@ export async function createEmptyDiagram(id: string, title: string): Promise<voi
     edges: [],
   };
   await saveDiagram(diagram);
+}
+
+// ─── Timelines ────────────────────────────────────────────────────
+
+export interface TimelineSummary {
+  id: string;
+  title: string;
+  description?: string;
+  diagram: string;
+  eventCount: number;
+  totalDurationMs: number;
+}
+
+export async function listTimelines(): Promise<TimelineSummary[]> {
+  return fetchJson<TimelineSummary[]>("/api/timelines");
+}
+
+export async function loadTimeline(id: string): Promise<LoomTimeline> {
+  return fetchJson<LoomTimeline>(`/api/timelines/${id}`);
+}
+
+export async function saveTimeline(timeline: LoomTimeline): Promise<void> {
+  const res = await fetch(`/api/timelines/${timeline.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(timeline),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(
+      `save failed: ${res.status} ${(body as { error?: string }).error ?? ""}`
+    );
+  }
 }

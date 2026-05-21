@@ -2,24 +2,28 @@ import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft, Wifi, WifiOf
 import { useTheme } from "../theme";
 import type { SaveStatus, ConnectionStatus } from "../state";
 import { DiagramSwitcher } from "./DiagramSwitcher";
-import type { DiagramSummary } from "../loadDiagram";
+import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
+import type { ViewState } from "../useViewState";
 
 interface Props {
-  diagramId: string;
+  viewKind: "diagram" | "timeline";
+  viewId: string;
   title: string;
   subtitle?: string;
   diagrams: DiagramSummary[];
+  timelines: TimelineSummary[];
   saveStatus: SaveStatus;
   saveError: string | null;
   connectionStatus: ConnectionStatus;
-  validationErrorCount: number;
+  validationErrorCount?: number;
   onClickAdd: () => void;
   addMenuOpen: boolean;
   isDefault: boolean;
   onClickHome: () => void;
-  onNavigate: (id: string) => void;
+  onNavigate: (view: ViewState) => void;
   onCreateDiagram: () => void;
-  addButtonRef: React.RefObject<HTMLButtonElement>;
+  addButtonRef: React.RefObject<HTMLButtonElement> | null;
+  hideAddButton?: boolean;
 }
 
 function ConnectionDot({ status }: { status: ConnectionStatus }) {
@@ -92,14 +96,16 @@ function SaveIndicator({
 }
 
 export function TopBar({
-  diagramId,
+  viewKind,
+  viewId,
   title,
   subtitle,
   diagrams,
+  timelines,
   saveStatus,
   saveError,
   connectionStatus,
-  validationErrorCount,
+  validationErrorCount = 0,
   onClickAdd,
   addMenuOpen,
   isDefault,
@@ -107,6 +113,7 @@ export function TopBar({
   onNavigate,
   onCreateDiagram,
   addButtonRef,
+  hideAddButton = false,
 }: Props) {
   const { theme, toggleTheme } = useTheme();
   return (
@@ -122,9 +129,11 @@ export function TopBar({
         </button>
       )}
       <DiagramSwitcher
-        currentId={diagramId}
+        currentKind={viewKind}
+        currentId={viewId}
         currentTitle={title}
         diagrams={diagrams}
+        timelines={timelines}
         onNavigate={onNavigate}
         onCreate={onCreateDiagram}
       />
@@ -139,15 +148,17 @@ export function TopBar({
       )}
       <ConnectionDot status={connectionStatus} />
       <SaveIndicator status={saveStatus} error={saveError} />
-      <button
-        ref={addButtonRef}
-        onClick={onClickAdd}
-        title="Add node"
-        aria-label="Add node"
-        aria-expanded={addMenuOpen}
-      >
-        <Plus size={16} /> Add
-      </button>
+      {!hideAddButton && addButtonRef && (
+        <button
+          ref={addButtonRef}
+          onClick={onClickAdd}
+          title="Add node"
+          aria-label="Add node"
+          aria-expanded={addMenuOpen}
+        >
+          <Plus size={16} /> Add
+        </button>
+      )}
       <button
         onClick={toggleTheme}
         title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}

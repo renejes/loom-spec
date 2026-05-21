@@ -491,9 +491,95 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   background: var(--border);
   margin: 6px 0;
 }
+.switcher-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px;
+}
 .switcher-item.new {
   color: var(--accent);
   font-weight: 500;
+}
+
+/* ─── Timeline view ─────────────────────────────────────────────── */
+.timeline-app {
+  /* same as .app — single column canvas + inspector. Subtitled grid. */
+}
+.timeline-canvas-wrap {
+  padding: 16px;
+  overflow: auto;
+}
+.timeline-wrap {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+}
+.timeline-svg {
+  display: block;
+  background: var(--bg-canvas);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+}
+.timeline-lane-sep {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.timeline-track-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.timeline-axis-line {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+.timeline-tick-mark {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+.timeline-tick-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.5;
+}
+.timeline-tick-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.timeline-clip {
+  cursor: pointer;
+  transition: filter 0.1s;
+}
+.timeline-clip:hover {
+  filter: brightness(1.15);
+}
+.timeline-clip-label {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+  paint-order: stroke fill;
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+}
+.timeline-clip.kind-io rect {
+  stroke-dasharray: 4 3;
+}
+.timeline-clip.kind-wait rect {
+  fill-opacity: 0.4;
+}
+.timeline-clip.kind-error rect {
+  stroke: var(--status-stale) !important;
 }
 
 /* ─── Node card (rendered inside xyflow node) ──────────────────── */
