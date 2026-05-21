@@ -47,6 +47,23 @@ source-of-truth documentation that must stay in sync with code.
   `<name>.flow.json` instead of cramming it into an existing diagram.
 - Link from the overview with a `drill_down` reference if appropriate.
 
+## Preferred tools (when the MCP server is wired up)
+
+If a `loom-spec` MCP server is registered with the host (e.g. via
+`.mcp.json`), prefer its tools over raw JSON edits:
+
+- `loom_list_diagrams`, `loom_read_diagram`, `loom_read_node_types` for reading
+- `loom_add_node`, `loom_update_node`, `loom_mark_stale`, `loom_delete_node`
+- `loom_add_edge`, `loom_delete_edge`
+- `loom_validate` to check the whole spec for schema errors and code-ref drift
+
+They validate against the schema before writing, so invalid edits fail
+fast instead of corrupting the file. They're also more token-efficient
+than re-reading + re-writing JSON on every mutation.
+
+If the MCP server is not available, edit the JSON files directly using
+the rules above — the format is stable and tools-agnostic by design.
+
 ## Format reference
 
 - Status enum: `planned`, `implemented`, `stale`, `deprecated`.

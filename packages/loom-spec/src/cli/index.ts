@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { runInit } from "./init.js";
 import { runView } from "./view.js";
+import { runValidate } from "./validate.js";
+import { runMcp } from "./mcp.js";
 
 const HELP = `loom-spec — node-based architecture spec for your repo
 
@@ -12,6 +14,19 @@ Usage:
   loom-spec view [--root <dir>] [--port <n>] [--dev]
       Start the local browser editor. Walks up from --root (default: cwd)
       to find the nearest .loom/ directory.
+
+  loom-spec validate [--root <dir>] [--json]
+      Check every diagram for schema validity and code-ref drift
+      (missing files, missing symbols, out-of-range line refs).
+      Exits non-zero if any issue is found. Use as a CI step or
+      pre-commit hook.
+
+  loom-spec mcp [--root <dir>]
+      Start a Model Context Protocol server on stdio. Exposes
+      loom_list_diagrams, loom_read_diagram, loom_add_node,
+      loom_update_node, loom_mark_stale, loom_delete_node,
+      loom_add_edge, loom_delete_edge, loom_validate as MCP tools.
+      Wire it into Claude Code's mcp.json (or any MCP-capable client).
 
   loom-spec --help
       Print this help.
@@ -58,6 +73,21 @@ async function main() {
       root: (flags.root as string) ?? process.cwd(),
       port: flags.port ? Number(flags.port) : 7777,
       dev: Boolean(flags.dev),
+    });
+    return;
+  }
+
+  if (subcommand === "validate") {
+    await runValidate({
+      root: (flags.root as string) ?? process.cwd(),
+      json: Boolean(flags.json),
+    });
+    return;
+  }
+
+  if (subcommand === "mcp") {
+    await runMcp({
+      root: (flags.root as string) ?? process.cwd(),
     });
     return;
   }

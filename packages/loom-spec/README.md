@@ -49,6 +49,39 @@ Refuses to overwrite an existing `.loom/` unless `--force`.
 
 Starts a local browser editor. Walks up from `--root` (default: cwd) to find the nearest `.loom/`. Opens on port 7777 by default.
 
+### `loom-spec validate [--root <dir>] [--json]`
+
+Checks every diagram for schema validity plus **code-ref drift**: missing files, missing symbols, out-of-range line ranges. Skips nodes marked `planned` or `deprecated` (their code may legitimately not exist). Exit code is non-zero if any issue is found — useful as a CI step or pre-commit hook.
+
+```bash
+loom-spec validate
+# ✗ overview.flow.json — Todo App
+#   5 nodes, 5 edges, 3 code refs checked
+#   ✗ todo-api → src/server/routes/todos.ts#todoRouter: symbol 'todoRouter' not found
+```
+
+### `loom-spec mcp [--root <dir>]`
+
+Starts a **Model Context Protocol** server on stdio. Wire it into Claude Code (or any MCP-capable agent) via the host's `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "loom-spec": {
+      "command": "npx",
+      "args": ["loom-spec", "mcp"]
+    }
+  }
+}
+```
+
+The server exposes semantic tools that validate against the schema before writing, more token-efficient than re-reading and re-writing the JSON on every change:
+
+- `loom_list_diagrams`, `loom_read_diagram`, `loom_read_node_types`
+- `loom_add_node`, `loom_update_node`, `loom_mark_stale`, `loom_delete_node`
+- `loom_add_edge`, `loom_delete_edge`
+- `loom_validate` (same drift check as the CLI)
+
 In the editor you can:
 
 - Drag nodes; edits debounce and write to disk within ~500ms
