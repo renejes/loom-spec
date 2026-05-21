@@ -45,6 +45,8 @@ Writes:
 
 Refuses to overwrite an existing `.loom/` unless `--force`.
 
+Add `--mcp` to also register the MCP server in `.mcp.json` (idempotent merge — existing entries are preserved). Or run `npx loom-spec install-mcp` to register it after the fact.
+
 ### `loom-spec view [--root <dir>] [--port <n>]`
 
 Starts a local browser editor. Walks up from `--root` (default: cwd) to find the nearest `.loom/`. Opens on port 7777 by default.
@@ -69,11 +71,13 @@ Starts a **Model Context Protocol** server on stdio. Wire it into Claude Code (o
   "mcpServers": {
     "loom-spec": {
       "command": "npx",
-      "args": ["loom-spec", "mcp"]
+      "args": ["-y", "loom-spec", "mcp"]
     }
   }
 }
 ```
+
+If you'd rather not hand-edit, `npx loom-spec install-mcp` writes this entry into `.mcp.json` for you (merging with any existing servers, idempotent).
 
 The server exposes semantic tools that validate against the schema before writing, more token-efficient than re-reading and re-writing the JSON on every change:
 

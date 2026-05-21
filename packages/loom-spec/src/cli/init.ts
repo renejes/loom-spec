@@ -1,10 +1,12 @@
 import { mkdir, readFile, writeFile, readdir, stat } from "node:fs/promises";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { installMcpEntry } from "./mcpConfig.js";
 
 export interface InitArgs {
   path: string;
   force: boolean;
+  mcp: boolean;
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -71,9 +73,32 @@ export async function runInit(args: InitArgs): Promise<void> {
   for (const f of written) {
     console.log(`  ${relative(target, f)}`);
   }
+  if (args.mcp) {
+    console.log();
+    try {
+      const report = await installMcpEntry(target);
+      const rel = relative(target, report.path);
+      if (report.action === "unchanged") {
+        console.log(`MCP entry already present in ${rel}.`);
+      } else {
+        console.log(
+          `${report.action === "created" ? "Created" : "Updated"} ${rel} with the loom-spec MCP server.`
+        );
+      }
+    } catch (e) {
+      console.error(`error registering MCP entry: ${(e as Error).message}`);
+      process.exitCode = 1;
+    }
+  }
+
   console.log();
   console.log("Next steps:");
   console.log("  1. Run `npx loom-spec view` to open the editor.");
   console.log("  2. Edit `.loom/node-types.json` to add project-specific node types.");
   console.log("  3. Start populating `.loom/diagrams/overview.flow.json`.");
+  if (!args.mcp) {
+    console.log(
+      "  4. To register the MCP server: re-run with `--mcp`, or `npx loom-spec install-mcp`."
+    );
+  }
 }

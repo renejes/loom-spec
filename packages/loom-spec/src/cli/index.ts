@@ -3,13 +3,19 @@ import { runInit } from "./init.js";
 import { runView } from "./view.js";
 import { runValidate } from "./validate.js";
 import { runMcp } from "./mcp.js";
+import { runInstallMcp } from "./installMcp.js";
 
 const HELP = `loom-spec — node-based architecture spec for your repo
 
 Usage:
-  loom-spec init [--path <dir>] [--force]
+  loom-spec init [--path <dir>] [--force] [--mcp]
       Scaffold .loom/ and .claude/skills/loom-spec/ in the target directory.
-      Defaults to current working directory.
+      With --mcp, also register the MCP server in .mcp.json (merging
+      with any existing entries). Defaults to current working directory.
+
+  loom-spec install-mcp [--path <dir>]
+      Register the loom-spec MCP server in .mcp.json without touching
+      anything else. Idempotent — safe to run multiple times.
 
   loom-spec view [--root <dir>] [--port <n>] [--dev]
       Start the local browser editor. Walks up from --root (default: cwd)
@@ -64,6 +70,14 @@ async function main() {
     await runInit({
       path: (flags.path as string) ?? process.cwd(),
       force: Boolean(flags.force),
+      mcp: Boolean(flags.mcp),
+    });
+    return;
+  }
+
+  if (subcommand === "install-mcp") {
+    await runInstallMcp({
+      path: (flags.path as string) ?? process.cwd(),
     });
     return;
   }
