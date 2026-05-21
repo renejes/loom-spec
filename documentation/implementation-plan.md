@@ -306,18 +306,30 @@ Broken into 7 incremental steps. Each one lands something usable on its own; the
 
 **Files touched.** `src/view/components/TimelineCanvas.tsx` (playhead rendering + active class), `src/view/state.ts` (playback state, no need for a separate hook — fits in there), `src/view/components/TopBar.tsx` (transport controls when a timeline is active).
 
-### 15e. Side-by-side mini graph + edge pulse (1d)
+### 15e. Side-by-side mini graph + edge pulse (1d) — **active**
 
 **Goal.** Next to the timeline, a smaller live-updating graph view. Nodes glow when their clip is currently active. Edges whose `from` node is active visually pulse along their path.
 
 **Approach.**
-- Layout: timeline on the left ~60%, mini graph on the right ~40%. Resizable splitter optional.
-- Mini graph reuses the existing DiagramCanvas in read-only mode (no drag, no delete).
-- Pass `activeNodeIds: Set<string>` from playback state. NodeCard gets a `data.active` prop → CSS class triggers a `box-shadow` glow in the node-type color.
-- Custom xyflow edge variant `PulseEdge`: when `data.pulsing === true`, renders a small bright marker that animates along the path via SVG `<animateMotion>` or CSS `stroke-dashoffset` trick. Use the existing `ParallelEdge` as a starting point.
-- Pulsing decision: for each active event, find edges where `e.from === event.node`. Mark those as pulsing for the duration of the event.
+- Layout change: `TimelineView` becomes a 3-column app (TopBar / TransportBar / [Canvas split | Inspector]). The canvas area splits into Timeline (left, ~55-65%) and MiniGraph (right). Resizable splitter is optional polish.
+- Mini graph reuses the existing `DiagramCanvas` in a new read-only mode:
+  - Add an `interactive?: boolean` prop (default `true`). When `false`: no drag (`nodesDraggable={false}`), no connection (`nodesConnectable={false}`), no delete handlers, no Add menu, no inspector wiring.
+  - Pass `activeNodeIds: Set<string>` and `pulsingEdgeIds: Set<string>` as props that flow through to the custom node/edge data.
+- `NodeCard` gets a `data.active` boolean → CSS class triggers a `box-shadow` glow in the node-type color (the same `--node-color` variable we already use).
+- New `PulseEdge` custom edge type. The existing `ParallelEdge` is a good starting point (handles `EdgeLabelRenderer` + custom path). For pulse animation, the cleanest approach is a small `<circle>` element using SVG `<animateMotion>` along the path. CSS `stroke-dashoffset` is another option but harder to keep crisp.
+- Pulse decision: in `TimelineView`, derive `activeNodeIds = Set(events.where(isActive(e)).map(e => e.node))` and `pulsingEdgeIds = Set(diagram.edges.where(e => activeNodeIds.has(stripPort(e.from))).map(e => e.id))`. Memoize so we don't recompute every frame.
 
-**Files touched.** `src/view/components/TimelineCanvas.tsx` (split layout), `src/view/components/DiagramCanvas.tsx` (read-only mode), `src/view/components/NodeCard.tsx` (active glow), new `src/view/components/PulseEdge.tsx`, `src/view/styles.css`.
+**Files touched.**
+- `src/view/components/TimelineView.tsx` — split layout, derive active sets, pass to children.
+- `src/view/components/DiagramCanvas.tsx` — new `interactive`, `activeNodeIds`, `pulsingEdgeIds` props.
+- `src/view/components/NodeCard.tsx` — render active glow when `data.active === true`.
+- New `src/view/components/PulseEdge.tsx` — animated SVG marker traveling along the path.
+- `src/view/styles.css` — split-layout grid, mini-graph container styling, glow + pulse CSS.
+
+**Notes from 15b–15d that apply.**
+- **Animation loop**: we already proved that `requestAnimationFrame` is throttled in iframe contexts. Re-use the `setInterval(16)` pattern already in `TimelineView`. The pulsing edges don't need their own loop — they pulse via SVG `<animateMotion>` (declarative, always runs) or CSS animation (also declarative).
+- **Performance**: deriving `activeNodeIds` on every position change is fine for small timelines, but if the example grows much beyond 100 events we'll need to index events by `[start_ms, end_ms]` and binary-search. For 15e: don't optimize yet.
+- **xyflow read-only**: the `nodesDraggable={false}` + `nodesConnectable={false}` flags are well-supported. Skip `proOptions.hideAttribution` is already set.
 
 ### 15f. MCP tools (0.5d)
 
@@ -400,5 +412,5 @@ Broken into 7 incremental steps. Each one lands something usable on its own; the
 ## Notes on sequencing
 
 - Items 1–14 are all shipped in v0.1.0 / v0.1.1 on npm; left in place as a record of the build order.
-- Item 15 (timeline view) is the current active line of work and is broken into 7 substeps above. 15a → 15e are the core; 15f adds agent integration; 15g is the optional perf-regression differentiator.
+- Item 15 (timeline view) is the current active line of work. **15a, 15b, 15c, 15d are shipped**; 15e is the next target; 15f and 15g remain pending. 15a → 15e are the core experience; 15f adds agent integration; 15g is the optional perf-regression differentiator.
 - Items 16–19 (custom-type fields, cross-tool skill discovery, init --upgrade, share mode) remain on the Phase 2 backlog. Independent of each other; pick by what real-world use surfaces as the next pain.
