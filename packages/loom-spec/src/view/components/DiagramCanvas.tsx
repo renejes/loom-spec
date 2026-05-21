@@ -11,10 +11,12 @@ import {
   type OnConnect,
 } from "@xyflow/react";
 import { NodeCard, type NodeCardData } from "./NodeCard";
+import { GroupNode, type GroupNodeData } from "./GroupNode";
 import type { LoomDiagram, Edge as LoomEdge } from "../../types/diagram";
 import type { LoomNodeTypes } from "../../types/node-types";
 import type { Selection } from "../App";
 import { uniqueEdgeId } from "../state";
+import { computeGroupBboxes, sortGroupsByDepth } from "../groupLayout";
 
 const EDGE_COLOR: Record<LoomEdge["kind"], string> = {
   request: "var(--edge-request)",
@@ -26,7 +28,7 @@ const EDGE_COLOR: Record<LoomEdge["kind"], string> = {
   control: "var(--edge-control)",
 };
 
-const nodeTypes = { loom: NodeCard };
+const nodeTypes = { loom: NodeCard, loomGroup: GroupNode };
 
 interface Props {
   diagram: LoomDiagram;
@@ -54,20 +56,43 @@ export function DiagramCanvas({
   onDeleteEdge,
   onAddEdge,
 }: Props) {
-  const flowNodes: FlowNode<NodeCardData>[] = useMemo(
-    () =>
-      diagram.nodes.map((n) => ({
-        id: n.id,
-        type: "loom",
-        position: n.position,
-        selected: selection?.kind === "node" && selection.id === n.id,
-        data: {
-          node: n,
-          typeDef: nodeTypesConfig.types[n.type],
+  const flowNodes: FlowNode<NodeCardData | GroupNodeData>[] = useMemo(() => {
+    // Group frames render first (lower z-index) so children sit on top.
+    // Outer groups before inner groups so nesting stacks correctly.
+    const bboxes = computeGroupBboxes(diagram);
+    const sortedGroups = sortGroupsByDepth(diagram.groups ?? []);
+    const groupNodes: FlowNode<GroupNodeData>[] = sortedGroups.flatMap((g) => {
+      const bbox = bboxes.get(g.id);
+      if (!bbox) return [];
+      return [
+        {
+          id: `__group__${g.id}`,
+          type: "loomGroup",
+          position: { x: bbox.x, y: bbox.y },
+          width: bbox.width,
+          height: bbox.height,
+          draggable: false,
+          selectable: false,
+          focusable: false,
+          deletable: false,
+          data: { group: g },
         },
-      })),
-    [diagram, nodeTypesConfig, selection]
-  );
+      ];
+    });
+
+    const itemNodes: FlowNode<NodeCardData>[] = diagram.nodes.map((n) => ({
+      id: n.id,
+      type: "loom",
+      position: n.position,
+      selected: selection?.kind === "node" && selection.id === n.id,
+      data: {
+        node: n,
+        typeDef: nodeTypesConfig.types[n.type],
+      },
+    }));
+
+    return [...groupNodes, ...itemNodes];
+  }, [diagram, nodeTypesConfig, selection]);
 
   const flowEdges: FlowEdge[] = useMemo(
     () =>
@@ -90,6 +115,8 @@ export function DiagramCanvas({
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
       for (const change of changes) {
+        // Group frames are synthetic; ignore any changes that target them.
+        if ("id" in change && change.id.startsWith("__group__")) continue;
         if (change.type === "position" && change.position && !change.dragging) {
           // Only commit on drag-end (dragging === false)
           onMoveNode(change.id, change.position);

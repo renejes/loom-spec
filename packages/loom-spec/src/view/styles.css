@@ -325,6 +325,31 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   background: var(--status-color, var(--text-subtle));
 }
 
+/* ─── Group frame ──────────────────────────────────────────────── */
+.group-frame {
+  position: relative;
+  border: 1.5px dashed color-mix(in oklab, var(--group-color) 70%, var(--text-subtle));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--group-color) 15%, transparent);
+  pointer-events: none;
+}
+.group-label {
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  padding: 1px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid color-mix(in oklab, var(--group-color) 60%, var(--border));
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
 /* xyflow handle styling */
 .react-flow__handle {
   background: var(--node-color, var(--accent));
