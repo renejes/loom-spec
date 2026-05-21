@@ -5,7 +5,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateDiagram, validateNodeTypes } from "../src/validate.js";
+import { validateDiagram, validateNodeTypes, validateTimeline } from "../src/validate.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examplesRoot = resolve(here, "../../../examples");
@@ -69,6 +69,29 @@ for (const loomDir of await findLoomDirs(examplesRoot)) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
       failed++;
       console.log(`  ✗ diagrams — ${(e as Error).message}`);
+    }
+  }
+
+  // timelines/*.timeline.json
+  const timelinesDir = resolve(loomDir, "timelines");
+  try {
+    const files = await readdir(timelinesDir);
+    for (const f of files) {
+      if (!f.endsWith(".timeline.json")) continue;
+      const raw = await readFile(resolve(timelinesDir, f), "utf8");
+      const result = await validateTimeline(JSON.parse(raw));
+      if (result.ok) {
+        console.log(`  ✓ timelines/${f}`);
+      } else {
+        failed++;
+        console.log(`  ✗ timelines/${f}`);
+        for (const err of result.errors) console.log(`      ${err}`);
+      }
+    }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+      failed++;
+      console.log(`  ✗ timelines — ${(e as Error).message}`);
     }
   }
 }

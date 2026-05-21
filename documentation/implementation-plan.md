@@ -243,18 +243,117 @@ Then: edit something in the browser, edit the JSON file directly with `vim`, ver
 
 ---
 
-## 15. Timeline view (Phase 2)
+## 15. Timeline view (Phase 2, in progress)
 
-**Goal.** A second view mode that renders the same node universe along a horizontal time axis, à la DAW edit view. Useful for sequencing events, request/response timing, and signal flow.
+**Headline goal.** A second view that renders the same node universe along a horizontal time axis, à la DAW edit view, **plus** a play mode with a moving playhead that highlights active nodes and pulses signal edges in a side-by-side mini graph view. The static + animated combination is the differentiator.
 
-**Approach.** Larger; sketch only:
-- New file kind `.loom/timelines/*.timeline.json` referencing node IDs from existing diagrams.
-- Schema additions: `tracks` (one per relevant node or group), `events` (each has a `node_id`, `start_tick`, `duration_ticks`, optional `kind` matching loom edge kinds, optional `description`).
-- Renderer: SVG-based timeline with horizontal ticks, vertical tracks, clip rectangles per event. Hover shows details, click selects.
-- Same Hono routes pattern: `GET/PUT /api/timelines/:id`, validated, SSE-broadcast.
-- Inspector reuses the structure but with time-specific fields.
+Broken into 7 incremental steps. Each one lands something usable on its own; they can be paused between if scope changes.
 
-**Estimate.** 1–2 weeks of focused work. Largest single Phase 2 item.
+### 15a. Schema, types, example, validator (0.5d)
+
+**Goal.** `.timeline.json` format is defined, machine-validated, with a working example in the todo-app fixture.
+
+**Approach.**
+- New `packages/loom-spec/schema/timeline.schema.json`. Top-level: `{ version, id, title, diagram, events, tracks? }`.
+  - `diagram` references a diagram id; the timeline overlays that graph's nodes.
+  - `events`: array of `{ id, node, track?, start_ms, duration_ms, label?, description?, kind? }`. `kind` for color-coding (compute / io / wait / error) — separate from edge kind in the graph.
+  - `tracks` optional; if omitted, the renderer infers tracks from distinct event.track values.
+- Add to `scripts/generate-types.ts` so a `LoomTimeline` TS type is emitted next to `LoomDiagram`.
+- Extend `src/validate.ts` with a `validateTimeline` function using the same ajv 2020 instance.
+- Add an example `examples/todo-app/.loom/timelines/todo-completion.timeline.json` showing the full mark-as-done flow with realistic latencies and one overlap (concurrent client + server work).
+- Update `scripts/validate-examples.ts` to also walk `.loom/timelines/`.
+
+**Files touched.** schema (new), `scripts/generate-types.ts`, `src/validate.ts`, `scripts/validate-examples.ts`, `examples/todo-app/.loom/timelines/*.timeline.json` (new).
+
+### 15b. Read-only timeline view (1.5d)
+
+**Goal.** Browser editor can render a timeline file as horizontal tracks with clips.
+
+**Approach.**
+- New view route or URL hash variant: `#timeline:todo-completion` (alongside `#celebration-detail` for diagrams).
+- New `src/view/components/TimelineCanvas.tsx`. SVG-based, NOT xyflow — different layout problem (1D time axis instead of 2D graph). Pure React + SVG keeps it simple.
+- Layout: horizontal time axis with tick marks; vertical tracks (auto-distributed from `event.track`); clips rendered as rounded rectangles colored by node type. Hover shows a tooltip with label + start/duration. Click selects.
+- `loadTimeline` helper alongside `loadDiagram`; same fetch pattern.
+- New Hono routes: `GET /api/timelines`, `GET /api/timelines/:id`, `PUT /api/timelines/:id`. Reuse the same chokidar watcher with self-write suppression for `.timeline.json` paths.
+- SSE: extend `LoomChangeEvent` with `timeline-changed`.
+
+**Files touched.** `src/view/components/TimelineCanvas.tsx` (new), `src/view/state.ts` (parallel timeline state), `src/view/loadDiagram.ts` (add timeline loaders), `src/server/app.ts` (routes), `src/server/fileOps.ts` (timeline file ops), `src/server/watch.ts` (extend event kinds), `src/view/components/TopBar.tsx` (switcher should also list timelines).
+
+### 15c. Edit mode (1d)
+
+**Goal.** Add, drag, resize, delete clips with the mouse.
+
+**Approach.**
+- Drag clip horizontally → updates `start_ms`. Snap to a configurable grid (default 10ms).
+- Drag clip's right edge → updates `duration_ms`.
+- Drag clip vertically across tracks → updates `track`.
+- "+ Add event" button or click on empty track area → opens a small inline form: pick node (from referenced diagram), label, start, duration. Save = PUT to `/api/timelines/:id`.
+- Delete key on selected clip → remove.
+- Reuse the existing debounced auto-save pattern.
+
+**Files touched.** `src/view/components/TimelineCanvas.tsx` (interaction handlers), `src/view/state.ts` (timeline mutators), `src/view/components/Inspector.tsx` (clip-specific fields).
+
+### 15d. Playhead + play/pause/scrub + node glow (1d)
+
+**Goal.** Press play; a vertical line moves left→right over the timeline at real speed. Active clips highlight.
+
+**Approach.**
+- Global playback state: `{ playing: bool, position_ms: number, speed: 1 | 0.25 | 0.5 | 2 | 4 }`.
+- `requestAnimationFrame` loop while `playing === true`: advance `position_ms` by `delta * speed`.
+- For each event whose interval contains the current `position_ms`: add `active` class to its clip.
+- Top-bar controls: play / pause / stop, scrubbable timeline, speed dropdown.
+- Keyboard: Space = play/pause, arrows = scrub, Home = reset.
+
+**Files touched.** `src/view/components/TimelineCanvas.tsx` (playhead rendering + active class), `src/view/state.ts` (playback state, no need for a separate hook — fits in there), `src/view/components/TopBar.tsx` (transport controls when a timeline is active).
+
+### 15e. Side-by-side mini graph + edge pulse (1d)
+
+**Goal.** Next to the timeline, a smaller live-updating graph view. Nodes glow when their clip is currently active. Edges whose `from` node is active visually pulse along their path.
+
+**Approach.**
+- Layout: timeline on the left ~60%, mini graph on the right ~40%. Resizable splitter optional.
+- Mini graph reuses the existing DiagramCanvas in read-only mode (no drag, no delete).
+- Pass `activeNodeIds: Set<string>` from playback state. NodeCard gets a `data.active` prop → CSS class triggers a `box-shadow` glow in the node-type color.
+- Custom xyflow edge variant `PulseEdge`: when `data.pulsing === true`, renders a small bright marker that animates along the path via SVG `<animateMotion>` or CSS `stroke-dashoffset` trick. Use the existing `ParallelEdge` as a starting point.
+- Pulsing decision: for each active event, find edges where `e.from === event.node`. Mark those as pulsing for the duration of the event.
+
+**Files touched.** `src/view/components/TimelineCanvas.tsx` (split layout), `src/view/components/DiagramCanvas.tsx` (read-only mode), `src/view/components/NodeCard.tsx` (active glow), new `src/view/components/PulseEdge.tsx`, `src/view/styles.css`.
+
+### 15f. MCP tools (0.5d)
+
+**Goal.** Agents can list, read, and mutate timelines the same way they handle diagrams.
+
+**Approach.**
+- New tools in `src/mcp/server.ts`:
+  - `loom_list_timelines()`
+  - `loom_read_timeline(id)`
+  - `loom_add_event({ timeline, node, track?, start_ms, duration_ms, label?, kind? })`
+  - `loom_update_event({ timeline, id, patch })`
+  - `loom_delete_event({ timeline, id })`
+- Validate referenced node exists in the underlying diagram before writing — extends drift checks naturally.
+- Update SKILL.md template with a 6th example: "When the user wants to document a sequence", showing the agent generating a timeline from architectural reasoning or from log data.
+
+**Files touched.** `src/mcp/server.ts`, `templates/.claude/skills/loom-spec/SKILL.md`, `examples/todo-app/.claude/skills/loom-spec/SKILL.md`, `src/server/fileOps.ts` (timeline write with self-write tracking).
+
+### 15g. OpenTelemetry / log import (1d, optional)
+
+**Goal.** `loom-spec import-trace trace.json --as user-login --diagram overview` reads an OTel trace file and generates a timeline that mirrors the actual spans.
+
+**Approach.**
+- New `src/cli/importTrace.ts` subcommand.
+- Parse OTel JSON (start with the simple `traces.json` shape; W3C Trace Context is a follow-on).
+- For each span, find the closest matching node in the named diagram (heuristic: span attributes like `service.name` matched against node labels / code_refs paths). Suggest mappings interactively or via a `--map` JSON file.
+- Emit a `.timeline.json`. Optionally append to an existing timeline with `--append`.
+- Stretch: a "diff mode" in the UI that shows planned (hand-authored) vs. actual (imported) side by side on the same axis. This is where this whole feature becomes a perf-regression tool.
+
+**Files touched.** `src/cli/importTrace.ts` (new), `src/cli/index.ts` (subcommand dispatch), `documentation/import-trace.md` (new — explains the OTel shape we accept).
+
+**Total estimate.** 6–7 days of focused work for 15a → 15f. 15g is another day if pursued.
+
+**Dependencies / risks.**
+- **Bundle size.** Adding a timeline view risks pushing the JS bundle past 700kB. Mitigation: code-split the timeline view route so it only loads when the user opens a timeline.
+- **`@xyflow/react` as read-only mini graph.** Reusing the existing canvas in non-interactive mode should work; if it's a fight, fall back to a hand-rolled SVG mini-renderer for the play-mode view.
+- **Track auto-inference.** If users don't specify `track` on events, we need a deterministic default. Plan: track = node id (one track per node), and the auto-layout algorithm orders tracks top-down by first appearance.
 
 ---
 
@@ -300,7 +399,6 @@ Then: edit something in the browser, edit the JSON file directly with `vim`, ver
 
 ## Notes on sequencing
 
-- Items 1–4 are the v1.0 blockers and should be done in order.
-- Items 5–9 are independent of each other and of 1–4; pick whichever is most painful.
-- Items 10–14 are quality-of-life; defer until a real user is hitting them.
-- Phase 2 items are independent. Timeline view (15) is the highest-leverage differentiator; MCP server (16) is the highest-leverage agent integration; drift detection (17) is the highest-leverage maintenance feature. Pick by what kind of feedback the project most needs.
+- Items 1–14 are all shipped in v0.1.0 / v0.1.1 on npm; left in place as a record of the build order.
+- Item 15 (timeline view) is the current active line of work and is broken into 7 substeps above. 15a → 15e are the core; 15f adds agent integration; 15g is the optional perf-regression differentiator.
+- Items 16–19 (custom-type fields, cross-tool skill discovery, init --upgrade, share mode) remain on the Phase 2 backlog. Independent of each other; pick by what real-world use surfaces as the next pain.

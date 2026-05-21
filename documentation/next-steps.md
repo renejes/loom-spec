@@ -33,21 +33,47 @@ Things that aren't broken but should be sharper:
 
 ## Phase 2 — beyond the v1.0 cut
 
-Larger pieces of work, not blocking initial release:
+Larger pieces of work, not blocking initial release.
 
-15. **Timeline view.** The DAW-edit-view mental model from the original brief. Same data model, different render: horizontal time axis, tracks per node, "clips" of activity for events and signals. Probably its own schema (`*.timeline.json`) referencing existing node IDs.
-16. **MCP server.** Wrap the file ops in a Model Context Protocol server so any MCP-capable agent (Claude Code, Codex, others) can call high-level operations (`add_node`, `find_orphans`, `validate`, `verify_code_refs`) instead of just editing JSON.
-17. **Automated drift detection.** Walk every `code_refs`, verify the file exists and (where given) the symbol still resolves. Flag stale ones automatically. Could run as a pre-commit hook or via `loom-spec validate`.
-18. **Custom-type fields beyond primitives.** Right now `array` is a flat list of primitives. Real custom types may want nested objects, multi-value refs, etc. Decide when to extend the field-type vocabulary vs. push complexity into separate diagrams.
-19. **Cross-tool skill discovery.** Currently we only place the skill at `.claude/skills/loom-spec/`. If Codex/Cursor/others adopt different conventions, add `--agent=codex` style flags to `init`.
-20. **`loom-spec init --upgrade`.** Bump existing repos to a newer schema version when the schema changes. Needs a migration path.
-21. **Read-only "share" mode.** A flag that disables editing so the tool can be used as a static viewer (e.g., in a docs site).
+### 15. Timeline view (in progress)
 
-## Suggested order
+The DAW-edit-view mental model from the original brief: same node universe, rendered along a horizontal time axis. Tracks per subsystem; "clips" per event with start/duration. **Plus** a play-mode with a moving playhead that highlights active nodes in real time and pulses signal edges in a side-by-side mini graph view. The combination of static-timing + animated-flow is what makes this distinct from any existing tool.
 
-If picking up where we left off:
+Broken into 7 incremental steps so each lands something demoable on its own:
 
-- First the v1.0 blockers (1 → 4), in order.
-- Then UX gaps in priority order: 5 (groups) → 6, 7 (drill-down + switcher) → 8, 9 (polish).
-- Quality polish (10 → 14) when there's appetite.
-- Phase 2 items are independent — pick whichever creates the most leverage. Timeline view (15) is the most novel and the most likely differentiator.
+| # | Step | Effort | What you have after |
+|---|---|---|---|
+| 15a | Schema + autogen types + example timeline + validator | 0.5d | `.timeline.json` format defined, validating end-to-end |
+| 15b | Read-only Timeline View — clips on tracks, basic layout | 1.5d | Static visualization of a timeline file |
+| 15c | Edit mode — drag clips, resize, add/delete via mouse | 1d | Authoring timelines from scratch in the UI |
+| 15d | Playhead + Play/Pause/Scrub + node glow on active events | 1d | The DAW-style experience: hit play, watch active nodes light up in real time |
+| 15e | Side-by-side mini graph view; pulse edges when source is active | 1d | The "signal travels through the modules" effect; turns the timeline into living docs |
+| 15f | MCP tools (`loom_list_timelines`, `loom_add_event`, etc.) | 0.5d | Agents can author / update timelines too |
+| 15g | (Optional) OpenTelemetry / log import — `loom-spec import-trace` | 1d | Compare planned vs. actual timing; performance regression detection |
+
+Total: 6–7 days. Steps 15a→15e are the core DAW experience; 15f adds agent integration; 15g is the optional differentiator that turns this into a perf-regression tool.
+
+### 16. Custom-type fields beyond primitives
+
+Right now `array` is a flat list of primitives. Real custom types may want nested objects, multi-value refs, etc. Decide when to extend the field-type vocabulary vs. push complexity into separate diagrams.
+
+### 17. Cross-tool skill discovery
+
+Currently we only place the skill at `.claude/skills/loom-spec/`. If Codex/Cursor/others adopt different conventions, add `--agent=codex` style flags to `init`.
+
+### 18. `loom-spec init --upgrade`
+
+Bump existing repos to a newer schema version when the schema changes. Needs a migration path.
+
+### 19. Read-only "share" mode
+
+A flag that disables editing so the tool can be used as a static viewer (e.g., in a docs site).
+
+## Status of items 1–14 (Phase 1)
+
+All shipped in v0.1.0 and v0.1.1 on npm. Production build verified, MCP server wired, drift detection working, polish items closed.
+
+## Suggested order from here
+
+- Timeline view (15a → 15e in order); 15f and 15g whenever appropriate.
+- The other Phase 2 items (16–19) are independent — pick by what real-world use surfaces as the next pain.
