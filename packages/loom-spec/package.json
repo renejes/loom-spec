@@ -19,8 +19,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts",
     "dev": "concurrently -n server,view -c blue,magenta \"pnpm dev:server\" \"pnpm dev:view\"",
-    "dev:server": "tsx src/server/index.ts --dev --root ../../examples/todo-app --port 7778",
+    "dev:server": "tsx src/cli/index.ts view --dev --root ../../examples/todo-app --port 7778",
     "dev:view": "vite --config src/view/vite.config.ts",
+    "init:example": "tsx src/cli/index.ts init --path /tmp/loom-init-test --force",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/view/tsconfig.json --noEmit",
     "generate-types": "tsx scripts/generate-types.ts",
     "validate-examples": "tsx scripts/validate-examples.ts"
@@ -32,6 +33,7 @@
     "@xyflow/react": "^12.3.5",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
+    "chokidar": "^4.0.1",
     "hono": "^4.6.13",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",

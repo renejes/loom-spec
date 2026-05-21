@@ -27,6 +27,8 @@ export function useDiagramState(id: string) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDiagram = useRef<LoomDiagram | null>(null);
   const initialLoadDone = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Initial load
   useEffect(() => {
@@ -148,6 +150,52 @@ export function useDiagramState(id: string) {
     },
     [updateDiagram]
   );
+
+  // Subscribe to server-sent events for live updates from other writers
+  // (e.g. an AI agent editing the JSON while the UI is open).
+  useEffect(() => {
+    const es = new EventSource("/api/events");
+
+    const refetchDiagram = () => {
+      // Don't clobber unsaved local edits.
+      const status = stateRef.current.saveStatus;
+      if (status === "dirty" || status === "saving") return;
+      loadDiagram(id)
+        .then((spec) => {
+          latestDiagram.current = spec.diagram;
+          setState((s) => ({
+            ...s,
+            diagram: spec.diagram,
+            nodeTypes: spec.nodeTypes,
+            saveStatus: "idle",
+            saveError: null,
+          }));
+        })
+        .catch(() => {
+          // Keep existing state on failure; user can manually reload.
+        });
+    };
+
+    es.addEventListener("change", (evt) => {
+      try {
+        const data = JSON.parse((evt as MessageEvent).data) as {
+          type: string;
+          id?: string;
+        };
+        if (data.type === "diagram-changed" && data.id === id) {
+          refetchDiagram();
+        } else if (data.type === "node-types-changed") {
+          refetchDiagram();
+        }
+      } catch {
+        // ignore malformed events
+      }
+    });
+
+    return () => {
+      es.close();
+    };
+  }, [id]);
 
   // Cleanup pending save on unmount
   useEffect(() => {

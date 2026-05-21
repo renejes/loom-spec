@@ -53,10 +53,17 @@ export async function readDiagram(loomPath: string, id: string): Promise<LoomDia
   return JSON.parse(raw) as LoomDiagram;
 }
 
-export async function writeDiagram(loomPath: string, id: string, data: LoomDiagram): Promise<void> {
+export async function writeDiagram(
+  loomPath: string,
+  id: string,
+  data: LoomDiagram,
+  onWritten?: (path: string) => void
+): Promise<void> {
   await mkdir(diagramsDir(loomPath), { recursive: true });
   const serialized = JSON.stringify(data, null, 2) + "\n";
-  await writeFile(diagramFilePath(loomPath, id), serialized, "utf8");
+  const path = diagramFilePath(loomPath, id);
+  await writeFile(path, serialized, "utf8");
+  onWritten?.(path);
 }
 
 export async function readNodeTypes(loomPath: string): Promise<LoomNodeTypes> {

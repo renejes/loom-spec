@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { streamSSE } from "hono/streaming";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { resolve } from "node:path";
 import {
   listDiagrams,
   readDiagram,
@@ -10,16 +10,17 @@ import {
 } from "./fileOps.js";
 import { validateDiagram, validateNodeTypes } from "../validate.js";
 import type { LoomRoot } from "./findLoomRoot.js";
+import type { LoomWatcher, LoomChangeEvent } from "./watch.js";
 
 export interface AppOptions {
   loomRoot: LoomRoot;
-  serveSpaFrom?: string; // path to built SPA (omit in dev)
+  watcher: LoomWatcher;
+  serveSpaFrom?: string;
 }
 
-export function createApp({ loomRoot, serveSpaFrom }: AppOptions) {
+export function createApp({ loomRoot, watcher, serveSpaFrom }: AppOptions) {
   const app = new Hono();
 
-  // CORS so the Vite dev server (on a different port) can call /api
   app.use("/api/*", cors());
 
   app.get("/api/root", (c) =>
@@ -70,7 +71,6 @@ export function createApp({ loomRoot, serveSpaFrom }: AppOptions) {
       return c.json({ error: "validation failed", details: result.errors }, 422);
     }
 
-    // Sanity: URL :id should match body id
     const diagram = body as { id?: string };
     if (diagram.id !== id) {
       return c.json(
@@ -80,14 +80,18 @@ export function createApp({ loomRoot, serveSpaFrom }: AppOptions) {
     }
 
     try {
-      await writeDiagram(loomRoot.loomPath, id, body as never);
+      await writeDiagram(
+        loomRoot.loomPath,
+        id,
+        body as never,
+        (path) => watcher.markSelfWrite(path)
+      );
       return c.json({ ok: true });
     } catch (e) {
       return c.json({ error: (e as Error).message }, 500);
     }
   });
 
-  // (validateNodeTypes is also exposed for symmetry/future use)
   app.put("/api/node-types", async (c) => {
     let body: unknown;
     try {
@@ -99,11 +103,60 @@ export function createApp({ loomRoot, serveSpaFrom }: AppOptions) {
     if (!result.ok) {
       return c.json({ error: "validation failed", details: result.errors }, 422);
     }
-    // not implemented as a writer yet — node-types edits go through init/upgrade flows
     return c.json({ error: "node-types editing is not enabled yet" }, 501);
   });
 
-  // Serve the prebuilt SPA in production. In dev, Vite handles this.
+  // Server-Sent Events: live updates when files change externally
+  app.get("/api/events", (c) =>
+    streamSSE(c, async (stream) => {
+      let notify: (() => void) | null = null;
+      const queue: LoomChangeEvent[] = [];
+      const onChange = (event: LoomChangeEvent) => {
+        queue.push(event);
+        notify?.();
+      };
+      watcher.on("change", onChange);
+
+      // Initial "hello" so the client knows the stream is alive
+      await stream.writeSSE({ data: JSON.stringify({ type: "connected" }) });
+
+      // Heartbeat so proxies don't close the stream
+      const heartbeat = setInterval(() => {
+        stream
+          .writeSSE({ data: JSON.stringify({ type: "ping" }) })
+          .catch(() => {});
+      }, 25000);
+
+      stream.onAbort(() => {
+        watcher.off("change", onChange);
+        clearInterval(heartbeat);
+        notify?.();
+      });
+
+      try {
+        while (!stream.aborted) {
+          if (queue.length > 0) {
+            const event = queue.shift()!;
+            await stream.writeSSE({
+              event: "change",
+              data: JSON.stringify(event),
+            });
+          } else {
+            await new Promise<void>((resolve) => {
+              notify = () => {
+                notify = null;
+                resolve();
+              };
+            });
+          }
+        }
+      } finally {
+        watcher.off("change", onChange);
+        clearInterval(heartbeat);
+      }
+    })
+  );
+
   if (serveSpaFrom) {
     app.use(
       "/*",
