@@ -17,7 +17,7 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.2.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Phase 1 and the non-optional parts of Phase 2 are on the registry. Phase 2 (timeline view) is 6 of 7 substeps shipped (15a–15f); 1 optional substep (15g, OTel trace import) pending.
+**v0.2.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)); a v0.3.0 release is queued on `main` covering items #22, #21, #20, and 15g. Phase 1 + Phase 2 are now feature-complete end-to-end (15a–15g shipped on main; #22 `+ Event` button, #21 timeline zoom, and #20 code-split landed alongside). Backlog at [next-steps.md](./next-steps.md) covers the remaining polish (editable timeline inspector, planned-vs-observed diff, sticky labels at high zoom, pure-SVG mini renderer, more trace formats).
 
 ### Phase 1 — shipped (v0.1.0 / v0.1.1)
 
@@ -36,18 +36,21 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 | Docs | README at repo root + npm-listing README, both with "why", typical workflow, custom types and drill-down examples |
 | Publishing | npm metadata complete (keywords, homepage, repository, bugs); LICENSE shipped; GitHub repo has description + 12 topics; GitHub releases for v0.1.0, v0.1.1, v0.2.0 |
 
-### Phase 2 — in progress (timeline view)
+### Phase 2 — feature-complete (timeline view)
 
 | Step | Status | What it added |
 |---|---|---|
-| 15a | ✅ shipped | Timeline schema + autogen types + example fixture (`todo-completion.timeline.json` with 6 events on 4 tracks) + validator |
-| 15a+ | ✅ shipped | Schema extended with `code_refs`, `triggered_by`, `tags` on events (function-level granularity, causation chains, filtering) |
-| 15b | ✅ shipped | Server routes (`GET`/`PUT /api/timelines`), URL hash routing (`#timeline:id`), `useTimelineState` hook, SVG TimelineCanvas with tracks + clips + time axis, TimelineInspector, switcher integration |
-| 15c | ✅ shipped | Edit mode: drag clips horizontally (start_ms), vertically (track), resize the right edge (duration), Delete key removes. Snap to 10ms grid. Debounced auto-save |
-| 15d | ✅ shipped | TransportBar (play/pause/reset + speed selector), `setInterval(16ms)` playback loop, playhead vertical line, scrubbable axis, active clip glow when playhead is inside their interval. Keyboard: Space = play/pause, Home = reset |
-| 15e | ✅ shipped | Side-by-side mini graph (DiagramCanvas in `interactive={false}` mode); `NodeCard` glows when an event on that node contains the playhead; new `PulseEdge` renders an SVG `<animateMotion>` marker traveling along edges whose source node is active. `pulsingEdgeIds` derived from `activeNodeIds` in `TimelineView`. fitView clamp lowered to minZoom=0.05 so narrow mini-panes don't crop. Refs badge moved to bottom-right. |
-| 15f | ✅ shipped | 5 MCP tools for timelines: `loom_list_timelines`, `loom_read_timeline`, `loom_add_event`, `loom_update_event`, `loom_delete_event`. `add_event` / `update_event` validate that the referenced node exists in the timeline's diagram before writing. `delete_event` scrubs dangling `triggered_by` references. Stdio smoke test (`scripts/smoke-mcp-timelines.ts`) covers all 5 tools end-to-end. SKILL.md gained a 6th example showing timeline authoring. |
-| 15g | pending (optional) | OpenTelemetry / trace import — `loom-spec import-trace` |
+| 15a | ✅ shipped (0.2.0) | Timeline schema + autogen types + example fixture (`todo-completion.timeline.json` with 6 events on 4 tracks) + validator |
+| 15a+ | ✅ shipped (0.2.0) | Schema extended with `code_refs`, `triggered_by`, `tags` on events (function-level granularity, causation chains, filtering) |
+| 15b | ✅ shipped (0.2.0) | Server routes (`GET`/`PUT /api/timelines`), URL hash routing (`#timeline:id`), `useTimelineState` hook, SVG TimelineCanvas with tracks + clips + time axis, TimelineInspector, switcher integration |
+| 15c | ✅ shipped (0.2.0) | Edit mode: drag clips horizontally (start_ms), vertically (track), resize the right edge (duration), Delete key removes. Snap to 10ms grid. Debounced auto-save |
+| 15d | ✅ shipped (0.2.0) | TransportBar (play/pause/reset + speed selector), `setInterval(16ms)` playback loop, playhead vertical line, scrubbable axis, active clip glow when playhead is inside their interval. Keyboard: Space = play/pause, Home = reset |
+| 15e | ✅ shipped (0.2.0) | Side-by-side mini graph (DiagramCanvas in `interactive={false}` mode); `NodeCard` glows when an event on that node contains the playhead; new `PulseEdge` renders an SVG `<animateMotion>` marker traveling along edges whose source node is active. `pulsingEdgeIds` derived from `activeNodeIds` in `TimelineView`. fitView clamp lowered to minZoom=0.05 so narrow mini-panes don't crop. Refs badge moved to bottom-right. |
+| 15f | ✅ shipped (0.2.0) | 5 MCP tools for timelines: `loom_list_timelines`, `loom_read_timeline`, `loom_add_event`, `loom_update_event`, `loom_delete_event`. `add_event` / `update_event` validate that the referenced node exists in the timeline's diagram before writing. `delete_event` scrubs dangling `triggered_by` references. Stdio smoke test (`scripts/smoke-mcp-timelines.ts`) covers all 5 tools end-to-end. SKILL.md gained a 6th example showing timeline authoring. |
+| #22 | ✅ shipped (`main`) | `+ Event` button in TransportBar opens an anchored node-picker (`AddEventMenu`); pick → creates event at the playhead (200ms long), auto-selects so drag/resize takes it from there. TransportBar gained an `actions` slot so TimelineView can hand it children without coupling. |
+| #21 | ✅ shipped (`main`) | Horizontal zoom (1× fit / 2× / 5× / 10× / 20×). pixelsPerMs = `(fitUsableW / totalMs) * zoom`; SVG grows past wrapper at zoom > 1, native overflow-x:auto handles pan; pickTickStep adapts to `totalMs / zoom`. Fixes the confetti compression in the demo fixture. |
+| #20 | ✅ shipped (`main`) | Lazy-loaded TimelineView via React.lazy + Suspense in App.tsx. Prod build now ships two chunks: main 513 kB (gz 161) + TimelineView 18 kB (gz 6). xyflow stays in main because the mini graph also uses DiagramCanvas — bigger savings would need a pure-SVG mini-renderer (backlog #26). |
+| 15g | ✅ shipped (`main`) | `loom-spec import-trace <trace.json> --as <id> --diagram <id>` CLI subcommand. Parses OTLP JSON via `src/server/otel.ts`, maps spans → nodes via `--map` overrides or a four-step heuristic (id-exact, id-substring-in-candidate, candidate-substring-in-label, candidate-substring-in-code-ref-path), preserves causation via `triggered_by`, supports `--append`. Smoke test (`scripts/smoke-import-trace.ts`) covers a 3-span OTLP trace against the todo-app fixture end-to-end. Docs at `documentation/import-trace.md`. |
 
 ## Architecture
 
@@ -82,18 +85,18 @@ graphical-programming/                          # workspace root, pnpm
     │   └── .claude/skills/loom-spec/SKILL.md
     ├── scripts/{generate-types,validate-examples}.ts
     └── src/
-        ├── cli/{index,init,view,validate,mcp,installMcp,mcpConfig}.ts
-        ├── server/{app,findLoomRoot,fileOps,watch,drift}.ts
+        ├── cli/{index,init,view,validate,mcp,installMcp,importTrace,mcpConfig}.ts
+        ├── server/{app,findLoomRoot,fileOps,watch,drift,otel}.ts
         ├── mcp/server.ts                       # MCP stdio server
         ├── view/                               # Vite-built React + xyflow SPA
-        │   ├── App.tsx                         # thin router (DiagramView | TimelineView)
+        │   ├── App.tsx                         # thin router (DiagramView | lazy TimelineView)
         │   ├── components/
         │   │   ├── DiagramView.tsx
-        │   │   ├── DiagramCanvas.tsx, NodeCard.tsx, GroupNode.tsx, ParallelEdge.tsx
+        │   │   ├── DiagramCanvas.tsx, NodeCard.tsx, GroupNode.tsx, ParallelEdge.tsx, PulseEdge.tsx
         │   │   ├── Inspector.tsx, AddNodeMenu.tsx
         │   │   ├── TimelineView.tsx
         │   │   ├── TimelineCanvas.tsx          # SVG-based, NOT xyflow
-        │   │   ├── TimelineInspector.tsx, TransportBar.tsx
+        │   │   ├── TimelineInspector.tsx, TransportBar.tsx, AddEventMenu.tsx
         │   │   ├── TopBar.tsx, DiagramSwitcher.tsx
         │   ├── state.ts, useTimelineState.ts
         │   ├── useViewState.ts                 # URL-hash routing: #diagram:x | #timeline:x
@@ -160,14 +163,20 @@ graphical-programming/                          # workspace root, pnpm
 - Timeline editor: drag/resize/delete clips round-trip to disk; playback advances correctly; scrub jumps the playhead; active glow fires on the right clips.
 - Mini graph (15e): active glow + edge pulse derived from playhead position; verified at `positionMs=30` that `todo-api` + `todo-store` glow and edges `e2`/`e3` (parallel) both pulse along their offset bezier paths.
 - Timeline MCP tools (15f): full stdio round-trip via the SDK Client confirms all 5 tools register, list/read return correct data, add/update/delete mutate the file deterministically, the node-existence cross-check rejects bad node ids, and the file is restored byte-for-byte after smoke-test cleanup.
+- `+ Event` button (#22): click → AddEventMenu opens with diagram nodes; pick → event appears at the playhead, auto-selected; clip count +1 → cleanup with Delete returns fixture to original byte-for-byte.
+- Timeline zoom (#21): at zoom=5× on todo-completion (1865ms total) the SVG widens from 619 → 2562 px in a 622-px wrapper; native horizontal scroll engages; tick spacing adapts.
+- Code-split (#20): production build emits a separate `TimelineView-*.js` chunk (~18 kB / gz 6 kB); main bundle is 513 kB; lazy chunk loads on navigation to `#timeline:*` via React.lazy + Suspense.
+- OTel import (15g): smoke test builds a 3-span OTLP trace in `/tmp`, runs `import-trace` against the todo-app fixture, asserts node mapping (todo-list-view / todo-api / todo-store), causation chain (ev2→ev1, ev3→ev2), and schema validity before cleaning the generated file.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite.
 - npm-installed flow (via the published `loom-spec@0.2.0`).
 - MCP server: stdio handshake returns all 15 tools (10 diagram + 5 timeline); `loom_list_diagrams` returns correct summaries.
+- `loom-spec import-trace`: smoke test (`scripts/smoke-import-trace.ts`) generates a 3-span OTLP trace, imports it onto the todo-app overview diagram, and asserts node mapping + causation + schema validity end-to-end.
 - `loom-spec validate` flags drift correctly and exits non-zero.
 - Auto-MCP registration: idempotent; preserves other entries.
 
 ## What is not yet verified
 
-- 15g (OTel import) — pending.
 - Behavior of very large diagrams or timelines (hundreds of nodes / events).
 - Real-world use by anyone other than the author.
+- OTLP shapes beyond what the smoke fixture covers (e.g. spans with
+  `links`, `events`, `status`; very deep trace trees; very long span names).

@@ -412,5 +412,6 @@ Broken into 7 incremental steps. Each one lands something usable on its own; the
 ## Notes on sequencing
 
 - Items 1–14 are all shipped in v0.1.0 / v0.1.1 on npm; left in place as a record of the build order.
-- Item 15 (timeline view) is the current active line of work. **15a, 15b, 15c, 15d are shipped**; 15e is the next target; 15f and 15g remain pending. 15a → 15e are the core experience; 15f adds agent integration; 15g is the optional perf-regression differentiator.
+- Item 15 (timeline view) is feature-complete. **15a–15g all shipped**; 15a–15f in v0.2.0 (on npm); 15g and the related backlog items #20 / #21 / #22 are on `main`, queued for v0.3.0.
 - Items 16–19 (custom-type fields, cross-tool skill discovery, init --upgrade, share mode) remain on the Phase 2 backlog. Independent of each other; pick by what real-world use surfaces as the next pain.
+- New backlog items: #23 editable timeline inspector, #24 planned-vs-observed diff view, #25 sticky track labels at high zoom, #26 pure-SVG mini renderer, #27 OTLP-protobuf / Jaeger / Zipkin support.

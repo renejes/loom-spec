@@ -101,7 +101,7 @@ For internals — architecture, data flow, what's verified — see [documentatio
 
 ## Status
 
-`v0.2.0` — second usable release on npm. The diagram editor is functionally complete; the schema is stable; the timeline view (DAW-style) ships with edit, playback, side-by-side mini graph, and edge-pulse animation. Agents can author timelines through 5 MCP tools alongside the 10 diagram tools. Items still on the table: bundle-size reduction, timeline zoom + pan, optional OpenTelemetry trace import, and accumulated feedback from real-world use.
+`v0.2.0` on npm; a v0.3.0 release is queued on `main` covering the `+ Event` button, horizontal timeline zoom, code-split, and the `loom-spec import-trace` CLI for OpenTelemetry traces. Phase 1 + Phase 2 are feature-complete end-to-end — diagram editor, schema, MCP server (15 tools), timeline view (edit, playback, mini graph, edge pulse), and trace import. The backlog at [documentation/next-steps.md](documentation/next-steps.md) is mostly polish: editable timeline inspector, planned-vs-observed diff view, sticky labels at high zoom, pure-SVG mini renderer, more trace formats, and the kind of feedback that only shows up under real-world use.
 
 [CHANGELOG via GitHub releases](https://github.com/renejes/loom-spec/releases).
 
