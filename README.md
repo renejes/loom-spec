@@ -101,7 +101,7 @@ For internals — architecture, data flow, what's verified — see [documentatio
 
 ## Status
 
-`v0.1.x` — first usable release on npm. The editor is functionally complete; the schema is stable. Items still on the table: a timeline / DAW-style view for sequenced behaviour, bundle-size reduction, and accumulated feedback from real-world use.
+`v0.2.0` — second usable release on npm. The diagram editor is functionally complete; the schema is stable; the timeline view (DAW-style) ships with edit, playback, side-by-side mini graph, and edge-pulse animation. Agents can author timelines through 5 MCP tools alongside the 10 diagram tools. Items still on the table: bundle-size reduction, timeline zoom + pan, optional OpenTelemetry trace import, and accumulated feedback from real-world use.
 
 [CHANGELOG via GitHub releases](https://github.com/renejes/loom-spec/releases).
 

@@ -17,7 +17,7 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.1.1 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Phase 1 complete and on the registry. Phase 2 (timeline view) is in progress — 6 of 7 substeps shipped (15a–15f), 1 optional substep (15g) pending.
+**v0.2.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Phase 1 and the non-optional parts of Phase 2 are on the registry. Phase 2 (timeline view) is 6 of 7 substeps shipped (15a–15f); 1 optional substep (15g, OTel trace import) pending.
 
 ### Phase 1 — shipped (v0.1.0 / v0.1.1)
 
@@ -34,7 +34,7 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 | Skill | `.claude/skills/loom-spec/SKILL.md` follows the Agent Skills standard; ships with 5 worked examples (new feature, multi-step agent like LangGraph, rename, deletion, new domain) and an MCP-tools preference section |
 | Auto-MCP | `init --mcp` and `install-mcp` write `.mcp.json` idempotently with merge semantics (existing servers untouched) |
 | Docs | README at repo root + npm-listing README, both with "why", typical workflow, custom types and drill-down examples |
-| Publishing | npm metadata complete (keywords, homepage, repository, bugs); LICENSE shipped; GitHub repo has description + 12 topics; GitHub releases for v0.1.0 and v0.1.1 |
+| Publishing | npm metadata complete (keywords, homepage, repository, bugs); LICENSE shipped; GitHub repo has description + 12 topics; GitHub releases for v0.1.0, v0.1.1, v0.2.0 |
 
 ### Phase 2 — in progress (timeline view)
 
@@ -161,8 +161,8 @@ graphical-programming/                          # workspace root, pnpm
 - Mini graph (15e): active glow + edge pulse derived from playhead position; verified at `positionMs=30` that `todo-api` + `todo-store` glow and edges `e2`/`e3` (parallel) both pulse along their offset bezier paths.
 - Timeline MCP tools (15f): full stdio round-trip via the SDK Client confirms all 5 tools register, list/read return correct data, add/update/delete mutate the file deterministically, the node-existence cross-check rejects bad node ids, and the file is restored byte-for-byte after smoke-test cleanup.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite.
-- npm-installed flow (via the published `loom-spec@0.1.1`).
-- MCP server: stdio handshake returns the 10 tools; `loom_list_diagrams` returns correct summaries.
+- npm-installed flow (via the published `loom-spec@0.2.0`).
+- MCP server: stdio handshake returns all 15 tools (10 diagram + 5 timeline); `loom_list_diagrams` returns correct summaries.
 - `loom-spec validate` flags drift correctly and exits non-zero.
 - Auto-MCP registration: idempotent; preserves other entries.
 

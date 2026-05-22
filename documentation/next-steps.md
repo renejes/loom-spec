@@ -32,7 +32,7 @@ Independent of each other; pick by what real-world use surfaces as the next pain
 
 23. **Editable timeline inspector.** The TimelineInspector is read-only today; clip details are editable only by drag/resize. Field-level editing (label, kind, description, code_refs, tags, triggered_by) would round it out.
 
-## Shipped (v0.1.0 → v0.1.1)
+## Shipped (v0.1.0 → v0.2.0)
 
 Captured here so the docs don't claim "todo" for things that are done. See [project-status.md](./project-status.md) for the full breakdown.
 
