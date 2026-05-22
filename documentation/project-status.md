@@ -17,7 +17,7 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.1.1 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Phase 1 complete and on the registry. Phase 2 (timeline view) is in progress — 4 of 7 substeps shipped, 1 substep active.
+**v0.1.1 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Phase 1 complete and on the registry. Phase 2 (timeline view) is in progress — 6 of 7 substeps shipped (15a–15f), 1 optional substep (15g) pending.
 
 ### Phase 1 — shipped (v0.1.0 / v0.1.1)
 
@@ -45,8 +45,8 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 | 15b | ✅ shipped | Server routes (`GET`/`PUT /api/timelines`), URL hash routing (`#timeline:id`), `useTimelineState` hook, SVG TimelineCanvas with tracks + clips + time axis, TimelineInspector, switcher integration |
 | 15c | ✅ shipped | Edit mode: drag clips horizontally (start_ms), vertically (track), resize the right edge (duration), Delete key removes. Snap to 10ms grid. Debounced auto-save |
 | 15d | ✅ shipped | TransportBar (play/pause/reset + speed selector), `setInterval(16ms)` playback loop, playhead vertical line, scrubbable axis, active clip glow when playhead is inside their interval. Keyboard: Space = play/pause, Home = reset |
-| 15e | **active** | Side-by-side mini graph view; nodes glow when their event is active; edges pulse when their source node is active |
-| 15f | pending | MCP tools for timelines (`loom_list_timelines`, `loom_add_event`, etc.) |
+| 15e | ✅ shipped | Side-by-side mini graph (DiagramCanvas in `interactive={false}` mode); `NodeCard` glows when an event on that node contains the playhead; new `PulseEdge` renders an SVG `<animateMotion>` marker traveling along edges whose source node is active. `pulsingEdgeIds` derived from `activeNodeIds` in `TimelineView`. fitView clamp lowered to minZoom=0.05 so narrow mini-panes don't crop. Refs badge moved to bottom-right. |
+| 15f | ✅ shipped | 5 MCP tools for timelines: `loom_list_timelines`, `loom_read_timeline`, `loom_add_event`, `loom_update_event`, `loom_delete_event`. `add_event` / `update_event` validate that the referenced node exists in the timeline's diagram before writing. `delete_event` scrubs dangling `triggered_by` references. Stdio smoke test (`scripts/smoke-mcp-timelines.ts`) covers all 5 tools end-to-end. SKILL.md gained a 6th example showing timeline authoring. |
 | 15g | pending (optional) | OpenTelemetry / trace import — `loom-spec import-trace` |
 
 ## Architecture
@@ -121,7 +121,7 @@ graphical-programming/                          # workspace root, pnpm
 
 ### MCP server
 
-`loom-spec mcp` boots a stdio MCP server (using `@modelcontextprotocol/sdk`) that exposes 10 tools. Each mutation re-reads, applies the patch, validates against the schema, and writes — so invalid edits never corrupt the file. Tools cover diagrams only at the moment; timeline-mutating tools (15f) are pending.
+`loom-spec mcp` boots a stdio MCP server (using `@modelcontextprotocol/sdk`) that exposes 15 tools (10 for diagrams, 5 for timelines). Each mutation re-reads, applies the patch, validates against the schema, and writes — so invalid edits never corrupt the file. Timeline mutations additionally cross-check that the referenced node exists in the underlying diagram, catching agent typos at write time.
 
 `init --mcp` and `install-mcp` write `.mcp.json` with idempotent merge semantics — existing servers (e.g. Playwright MCP) and unrelated top-level keys are preserved.
 
@@ -158,6 +158,8 @@ graphical-programming/                          # workspace root, pnpm
 - TypeScript types autogenerate and the entire codebase typechecks cleanly.
 - Diagram editor: edits round-trip to disk; external edits propagate to UI; create/delete/edge ops all work; drift findings flagged correctly.
 - Timeline editor: drag/resize/delete clips round-trip to disk; playback advances correctly; scrub jumps the playhead; active glow fires on the right clips.
+- Mini graph (15e): active glow + edge pulse derived from playhead position; verified at `positionMs=30` that `todo-api` + `todo-store` glow and edges `e2`/`e3` (parallel) both pulse along their offset bezier paths.
+- Timeline MCP tools (15f): full stdio round-trip via the SDK Client confirms all 5 tools register, list/read return correct data, add/update/delete mutate the file deterministically, the node-existence cross-check rejects bad node ids, and the file is restored byte-for-byte after smoke-test cleanup.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite.
 - npm-installed flow (via the published `loom-spec@0.1.1`).
 - MCP server: stdio handshake returns the 10 tools; `loom_list_diagrams` returns correct summaries.
@@ -166,7 +168,6 @@ graphical-programming/                          # workspace root, pnpm
 
 ## What is not yet verified
 
-- Timeline 15e (mini graph alongside, edges pulsing) — the cliff still to climb.
-- 15f (MCP tools for timelines) and 15g (OTel import) — pending.
+- 15g (OTel import) — pending.
 - Behavior of very large diagrams or timelines (hundreds of nodes / events).
 - Real-world use by anyone other than the author.

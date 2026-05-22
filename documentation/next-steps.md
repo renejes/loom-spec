@@ -6,12 +6,10 @@ Forward-looking task list. For implementation detail, see [implementation-plan.m
 
 ### Timeline view (continued)
 
-Steps 15a–15d are shipped (schema, read-only renderer, edit mode, playback). The active target is **15e** — the mini graph view alongside the timeline that visualizes which nodes are active and pulses edges.
+Steps 15a–15f are shipped (schema, read-only renderer, edit mode, playback, mini graph + edge pulse, MCP tools). The remaining piece is optional.
 
 | # | Step | Effort | What you have after |
 |---|---|---|---|
-| 15e | **Side-by-side mini graph + edge pulse** | 1d | Playhead moves → nodes light up in the mini graph → edges from active nodes pulse along their path. The "signal travels through the modules" effect. |
-| 15f | MCP tools for timelines (`loom_list_timelines`, `loom_add_event`, etc.) | 0.5d | Agents can also author and update timelines |
 | 15g | (Optional) OpenTelemetry / log import — `loom-spec import-trace` | 1d | Generate timelines from real trace data; compare planned vs. actual |
 
 ## Phase 2 backlog (still open)
@@ -45,3 +43,5 @@ Captured here so the docs don't claim "todo" for things that are done. See [proj
 - Timeline 15b (read-only renderer).
 - Timeline 15c (edit mode — drag / resize / delete).
 - Timeline 15d (playback — transport bar + playhead + active clip glow + scrub + keyboard).
+- Timeline 15e (side-by-side mini graph + edge pulse — `NodeCard` glow driven by `activeNodeIds`, new `PulseEdge` with `<animateMotion>`).
+- Timeline 15f (5 MCP tools for timelines — `loom_list_timelines`, `loom_read_timeline`, `loom_add_event`, `loom_update_event`, `loom_delete_event`; node-existence cross-check; stdio smoke test).
