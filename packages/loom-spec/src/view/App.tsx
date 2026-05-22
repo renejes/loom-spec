@@ -1,10 +1,15 @@
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import { DiagramView } from "./components/DiagramView";
-import { TimelineView } from "./components/TimelineView";
 import { useViewState } from "./useViewState";
 import { useDiagramsList } from "./useDiagramsList";
 import { useTimelinesList } from "./useTimelinesList";
 import { createEmptyDiagram } from "./loadDiagram";
+
+// Lazy-load the timeline view so diagram-only users don't pay for it.
+// Pulls in TimelineCanvas, TransportBar, AddEventMenu, etc.
+const TimelineView = lazy(() =>
+  import("./components/TimelineView").then((m) => ({ default: m.TimelineView }))
+);
 
 // Re-export for backwards compatibility with components that import Selection
 // from "../App" (e.g. DiagramCanvas).
@@ -57,15 +62,34 @@ export function App() {
 
   if (view.kind === "timeline") {
     return (
-      <TimelineView
-        id={view.id}
-        diagrams={diagrams}
-        timelines={timelines}
-        isDefault={isDefault}
-        onClickHome={goHome}
-        onNavigate={navigate}
-        onCreateDiagram={handleCreateDiagramFromTimeline}
-      />
+      <Suspense
+        fallback={
+          <div className="app timeline-app">
+            <div className="topbar">
+              <div className="title">loom-spec</div>
+            </div>
+            <div
+              className="canvas-wrap"
+              style={{ padding: 24, color: "var(--text-muted)" }}
+            >
+              Loading timeline view…
+            </div>
+            <div className="inspector">
+              <div className="empty">—</div>
+            </div>
+          </div>
+        }
+      >
+        <TimelineView
+          id={view.id}
+          diagrams={diagrams}
+          timelines={timelines}
+          isDefault={isDefault}
+          onClickHome={goHome}
+          onNavigate={navigate}
+          onCreateDiagram={handleCreateDiagramFromTimeline}
+        />
+      </Suspense>
     );
   }
 

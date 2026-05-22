@@ -23,6 +23,9 @@ interface Props {
   playheadMs?: number;
   /** Optional callback when the user scrubs/clicks on the time axis. */
   onScrub?: (ms: number) => void;
+  /** Horizontal zoom multiplier. 1 = fit to container (default). >1 = stretched
+   *  wider, horizontal scroll appears. */
+  zoom?: number;
 }
 
 const LABEL_COL_W = 110;
@@ -108,6 +111,7 @@ export function TimelineCanvas({
   onUpdateEvent,
   playheadMs,
   onScrub,
+  zoom = 1,
 }: Props) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -139,9 +143,13 @@ export function TimelineCanvas({
     const trackOf = new Map<string, number>();
     tracks.forEach((t, i) => trackOf.set(t.id, i));
 
-    const usableW = Math.max(width - LABEL_COL_W - RIGHT_PAD, 100);
+    // Fit-to-container baseline; multiply by zoom to stretch (scroll appears
+    // when the resulting SVG width exceeds the wrapper).
+    const fitUsableW = Math.max(width - LABEL_COL_W - RIGHT_PAD, 100);
+    const usableW = fitUsableW * zoom;
     const pixelsPerMs = totalMs > 0 ? usableW / totalMs : 1;
-    const tickStep = pickTickStep(totalMs);
+    const svgWidth = LABEL_COL_W + usableW + RIGHT_PAD;
+    const tickStep = pickTickStep(totalMs / zoom);
     const ticks: number[] = [];
     for (let t = 0; t <= totalMs + tickStep * 0.001; t += tickStep) {
       ticks.push(t);
@@ -161,14 +169,15 @@ export function TimelineCanvas({
       trackOf,
       totalMs,
       pixelsPerMs,
+      svgWidth,
       tickStep,
       ticks,
       colorOf,
       svgHeight,
     };
-  }, [timeline, diagram, nodeTypes, width]);
+  }, [timeline, diagram, nodeTypes, width, zoom]);
 
-  const { tracks, trackOf, ticks, pixelsPerMs, colorOf, svgHeight, totalMs } =
+  const { tracks, trackOf, ticks, pixelsPerMs, colorOf, svgHeight, svgWidth, totalMs } =
     layout;
 
   // Resolve preview position for a clip mid-drag
@@ -279,7 +288,7 @@ export function TimelineCanvas({
       <svg
         ref={svgRef}
         className="timeline-svg"
-        width={width}
+        width={svgWidth}
         height={svgHeight}
         onClick={(e) => {
           if ((e.target as Element).tagName === "svg") onSelectEvent(null);
@@ -294,7 +303,7 @@ export function TimelineCanvas({
                 <rect
                   x={LABEL_COL_W}
                   y={y}
-                  width={width - LABEL_COL_W - RIGHT_PAD}
+                  width={svgWidth - LABEL_COL_W - RIGHT_PAD}
                   height={TRACK_H}
                   fill={t.color}
                   opacity={0.4}
@@ -302,7 +311,7 @@ export function TimelineCanvas({
               )}
               <line
                 x1={0}
-                x2={width}
+                x2={svgWidth}
                 y1={y}
                 y2={y}
                 className="timeline-lane-sep"
@@ -320,7 +329,7 @@ export function TimelineCanvas({
         })}
         <line
           x1={0}
-          x2={width}
+          x2={svgWidth}
           y1={AXIS_H + tracks.length * TRACK_H}
           y2={AXIS_H + tracks.length * TRACK_H}
           className="timeline-lane-sep"
@@ -330,7 +339,7 @@ export function TimelineCanvas({
         <rect
           x={LABEL_COL_W}
           y={0}
-          width={width - LABEL_COL_W - RIGHT_PAD}
+          width={svgWidth - LABEL_COL_W - RIGHT_PAD}
           height={AXIS_H}
           fill="transparent"
           style={{ cursor: onScrub ? "ew-resize" : "default" }}
@@ -349,7 +358,7 @@ export function TimelineCanvas({
         <g className="timeline-axis">
           <line
             x1={LABEL_COL_W}
-            x2={width - RIGHT_PAD}
+            x2={svgWidth - RIGHT_PAD}
             y1={AXIS_H - 1}
             y2={AXIS_H - 1}
             className="timeline-axis-line"

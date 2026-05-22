@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { TopBar } from "./TopBar";
 import { TimelineCanvas } from "./TimelineCanvas";
 import { TimelineInspector } from "./TimelineInspector";
 import { TransportBar } from "./TransportBar";
 import { DiagramCanvas } from "./DiagramCanvas";
-import { useTimelineState } from "../useTimelineState";
+import { AddEventMenu } from "./AddEventMenu";
+import { useTimelineState, uniqueEventId } from "../useTimelineState";
 import type { ViewState } from "../useViewState";
 import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
+import type { TimelineEvent } from "../../types/timeline";
 
 interface Props {
   id: string;
@@ -29,6 +32,9 @@ export function TimelineView({
 }: Props) {
   const state = useTimelineState(id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const [zoom, setZoom] = useState(1);
 
   // ─── Playback state (transient, not persisted) ──────────────────
   const [positionMs, setPositionMs] = useState(0);
@@ -117,6 +123,27 @@ export function TimelineView({
   const onScrub = useCallback((ms: number) => {
     setPositionMs(ms);
   }, []);
+
+  // Create a new event with sensible defaults: anchored at the playhead,
+  // 200ms long, on the picked node. Drag/resize takes it from there.
+  const onAddEvent = useCallback(
+    (nodeId: string) => {
+      const tl = state.timeline;
+      if (!tl) return;
+      const start = Math.max(0, Math.round(positionMs));
+      const event: TimelineEvent = {
+        id: uniqueEventId(tl),
+        node: nodeId,
+        start_ms: start,
+        duration_ms: 200,
+        kind: "compute",
+      };
+      state.addEvent(event);
+      setSelectedId(event.id);
+      setAddOpen(false);
+    },
+    [state, positionMs]
+  );
 
   // ─── Keyboard shortcuts ─────────────────────────────────────────
   useEffect(() => {
@@ -214,7 +241,41 @@ export function TimelineView({
         onPlayPause={onPlayPause}
         onReset={onReset}
         onSpeed={setSpeed}
+        actions={
+          <>
+            <button
+              ref={addButtonRef}
+              className="transport-add-event"
+              onClick={() => setAddOpen((v) => !v)}
+              title="Add event at playhead"
+            >
+              <Plus size={14} /> Event
+            </button>
+            <label className="transport-zoom">
+              <span className="muted">Zoom</span>
+              <select
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+              >
+                <option value={1}>1× (fit)</option>
+                <option value={2}>2×</option>
+                <option value={5}>5×</option>
+                <option value={10}>10×</option>
+                <option value={20}>20×</option>
+              </select>
+            </label>
+          </>
+        }
       />
+      {addOpen && (
+        <AddEventMenu
+          diagram={state.diagram}
+          nodeTypes={state.nodeTypes}
+          anchorRef={addButtonRef}
+          onPick={onAddEvent}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
       <div className="canvas-wrap timeline-canvas-wrap">
         <div className="timeline-split">
           <div className="timeline-split-pane timeline-split-left">
@@ -227,6 +288,7 @@ export function TimelineView({
               onUpdateEvent={state.updateEvent}
               playheadMs={positionMs}
               onScrub={onScrub}
+              zoom={zoom}
             />
           </div>
           <div className="timeline-split-pane timeline-split-right">

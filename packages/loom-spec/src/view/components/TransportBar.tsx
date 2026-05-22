@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Play, Pause, SkipBack } from "lucide-react";
 
 interface Props {
@@ -8,6 +9,10 @@ interface Props {
   onPlayPause: () => void;
   onReset: () => void;
   onSpeed: (s: number) => void;
+  /** Optional content rendered after the position readout, before the
+   *  right-side spacer. Used for things like an "+ Event" button that
+   *  the timeline view owns. */
+  actions?: ReactNode;
 }
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4];
@@ -25,6 +30,7 @@ export function TransportBar({
   onPlayPause,
   onReset,
   onSpeed,
+  actions,
 }: Props) {
   return (
     <div className="transport-bar">
@@ -48,6 +54,7 @@ export function TransportBar({
         <code>{fmt(positionMs)}</code>
         <span className="muted"> / {fmt(totalMs)}</span>
       </div>
+      {actions}
       <div className="transport-spacer" />
       <label className="transport-speed">
         <span className="muted">Speed</span>
