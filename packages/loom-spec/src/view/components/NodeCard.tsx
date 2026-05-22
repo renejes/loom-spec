@@ -37,6 +37,8 @@ export interface NodeCardData extends Record<string, unknown> {
   node: LoomNode;
   typeDef: NodeType | undefined;
   onDrillDown?: (id: string) => void;
+  /** Driven by the timeline playhead — true while an event on this node is currently active. */
+  active?: boolean;
 }
 
 /**
@@ -52,7 +54,7 @@ function handleTopPercent(index: number, total: number): string {
 }
 
 export function NodeCard({ data }: NodeProps) {
-  const { node, typeDef, onDrillDown } = data as NodeCardData;
+  const { node, typeDef, onDrillDown, active } = data as NodeCardData;
   const color = typeDef?.color ?? "#71717a";
   const Icon = typeDef?.icon ? (ICONS[typeDef.icon] ?? Box) : Box;
   const typeLabel = typeDef?.label ?? node.type;
@@ -64,7 +66,7 @@ export function NodeCard({ data }: NodeProps) {
 
   return (
     <div
-      className={`node-card status-${node.status}${hasInPorts || hasOutPorts ? " has-ports" : ""}`}
+      className={`node-card status-${node.status}${hasInPorts || hasOutPorts ? " has-ports" : ""}${active ? " active" : ""}`}
       style={{
         ["--node-color" as string]: color,
         ["--status-color" as string]: STATUS_COLOR[node.status],

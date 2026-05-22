@@ -3,6 +3,7 @@ import { TopBar } from "./TopBar";
 import { TimelineCanvas } from "./TimelineCanvas";
 import { TimelineInspector } from "./TimelineInspector";
 import { TransportBar } from "./TransportBar";
+import { DiagramCanvas } from "./DiagramCanvas";
 import { useTimelineState } from "../useTimelineState";
 import type { ViewState } from "../useViewState";
 import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
@@ -43,6 +44,32 @@ export function TimelineView({
       0
     );
   }, [state.timeline]);
+
+  // Nodes whose events contain the playhead — drives both the NodeCard glow
+  // in the mini graph and (via edge derivation) the pulsing edges.
+  const activeNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!state.timeline) return set;
+    for (const e of state.timeline.events) {
+      if (positionMs >= e.start_ms && positionMs <= e.start_ms + e.duration_ms) {
+        set.add(e.node);
+      }
+    }
+    return set;
+  }, [state.timeline, positionMs]);
+
+  // Edges whose source node is currently active. Strip ":port" suffixes so
+  // handle-specific edges still match their source node.
+  const pulsingEdgeIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!state.diagram) return set;
+    for (const edge of state.diagram.edges) {
+      const colon = edge.from.indexOf(":");
+      const fromNode = colon === -1 ? edge.from : edge.from.slice(0, colon);
+      if (activeNodeIds.has(fromNode)) set.add(edge.id);
+    }
+    return set;
+  }, [state.diagram, activeNodeIds]);
 
   // Playback tick. setInterval (not rAF) so the loop keeps running even
   // when the tab is in the background or inside an iframe that throttles
@@ -189,16 +216,29 @@ export function TimelineView({
         onSpeed={setSpeed}
       />
       <div className="canvas-wrap timeline-canvas-wrap">
-        <TimelineCanvas
-          timeline={state.timeline}
-          diagram={state.diagram}
-          nodeTypes={state.nodeTypes}
-          selectedEventId={selectedId}
-          onSelectEvent={setSelectedId}
-          onUpdateEvent={state.updateEvent}
-          playheadMs={positionMs}
-          onScrub={onScrub}
-        />
+        <div className="timeline-split">
+          <div className="timeline-split-pane timeline-split-left">
+            <TimelineCanvas
+              timeline={state.timeline}
+              diagram={state.diagram}
+              nodeTypes={state.nodeTypes}
+              selectedEventId={selectedId}
+              onSelectEvent={setSelectedId}
+              onUpdateEvent={state.updateEvent}
+              playheadMs={positionMs}
+              onScrub={onScrub}
+            />
+          </div>
+          <div className="timeline-split-pane timeline-split-right">
+            <DiagramCanvas
+              diagram={state.diagram}
+              nodeTypesConfig={state.nodeTypes}
+              interactive={false}
+              activeNodeIds={activeNodeIds}
+              pulsingEdgeIds={pulsingEdgeIds}
+            />
+          </div>
+        </div>
       </div>
       <TimelineInspector
         selectedEvent={selectedEvent}

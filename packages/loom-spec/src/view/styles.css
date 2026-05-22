@@ -561,7 +561,40 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 
 .timeline-canvas-wrap {
   padding: 16px;
+  overflow: hidden;
+}
+.timeline-split {
+  display: grid;
+  grid-template-columns: 60fr 40fr;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.timeline-split-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.timeline-split-left {
   overflow: auto;
+}
+.timeline-split-right {
+  position: relative;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* DiagramCanvas wraps itself in .canvas-wrap, which only sizes in the outer
+   app grid. Inside the timeline split it needs to fill its flex parent. */
+.timeline-split-right > .canvas-wrap {
+  grid-area: auto;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background: transparent;
 }
 .timeline-wrap {
   width: 100%;
@@ -639,6 +672,10 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   opacity: 0.6;
 }
 
+.pulse-marker {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
 .timeline-playhead-line {
   stroke: var(--accent);
   stroke-width: 2;
@@ -661,6 +698,13 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .node-card.status-planned    { border-style: dashed; opacity: 0.85; }
 .node-card.status-stale      { border-color: var(--status-stale); }
 .node-card.status-deprecated { opacity: 0.5; }
+.node-card.active {
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--node-color) 60%, transparent),
+    0 0 16px 2px color-mix(in oklab, var(--node-color) 75%, transparent),
+    var(--shadow);
+  transition: box-shadow 0.08s ease-out;
+}
 
 .node-card .node-header {
   display: flex;
@@ -700,7 +744,7 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .node-card .refs-badge {
   position: absolute;
   bottom: 6px;
-  left: 8px;
+  right: 8px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -715,6 +759,11 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   line-height: 1.2;
   pointer-events: auto;
   white-space: pre;
+}
+/* When the node also has a drill-down button (also bottom-right), shift the
+   refs badge left so they don't overlap. */
+.node-card:has(.drill-down-btn) .refs-badge {
+  right: 32px;
 }
 .node-card .refs-badge:hover {
   color: var(--text);
