@@ -4,6 +4,7 @@ import { runView } from "./view.js";
 import { runValidate } from "./validate.js";
 import { runMcp } from "./mcp.js";
 import { runInstallMcp } from "./installMcp.js";
+import { runImportTrace } from "./importTrace.js";
 
 const HELP = `loom-spec — node-based architecture spec for your repo
 
@@ -28,11 +29,18 @@ Usage:
       pre-commit hook.
 
   loom-spec mcp [--root <dir>]
-      Start a Model Context Protocol server on stdio. Exposes
-      loom_list_diagrams, loom_read_diagram, loom_add_node,
-      loom_update_node, loom_mark_stale, loom_delete_node,
-      loom_add_edge, loom_delete_edge, loom_validate as MCP tools.
-      Wire it into Claude Code's mcp.json (or any MCP-capable client).
+      Start a Model Context Protocol server on stdio. Exposes 15 tools
+      for diagrams (loom_list_diagrams, loom_add_node, loom_add_edge, …)
+      and timelines (loom_list_timelines, loom_add_event, …) — wire it
+      into Claude Code's mcp.json (or any MCP-capable client).
+
+  loom-spec import-trace <trace.json> --as <timeline-id> --diagram <diagram-id>
+                        [--map <mapping.json>] [--append] [--root <dir>]
+      Read an OpenTelemetry OTLP-JSON trace and generate a timeline that
+      mirrors the actual spans on the named diagram. Each span becomes
+      an event; parent/child relationships preserve as triggered_by;
+      service.name becomes the track. Spans whose service or name can't
+      be matched to a node are skipped — pass --map to override.
 
   loom-spec --help
       Print this help.
@@ -101,6 +109,31 @@ async function main() {
 
   if (subcommand === "mcp") {
     await runMcp({
+      root: (flags.root as string) ?? process.cwd(),
+    });
+    return;
+  }
+
+  if (subcommand === "import-trace") {
+    // Positional arg: the trace file path (first non-flag in rest).
+    const trace = rest.find((a) => a && !a.startsWith("--"));
+    if (!trace) {
+      console.error("import-trace: missing trace file path");
+      console.log(HELP);
+      process.exit(1);
+    }
+    const asId = flags.as as string | undefined;
+    const diagramId = flags.diagram as string | undefined;
+    if (!asId || !diagramId) {
+      console.error("import-trace: --as <timeline-id> and --diagram <diagram-id> are required");
+      process.exit(1);
+    }
+    await runImportTrace({
+      trace,
+      asId,
+      diagramId,
+      map: typeof flags.map === "string" ? flags.map : undefined,
+      append: Boolean(flags.append),
       root: (flags.root as string) ?? process.cwd(),
     });
     return;
