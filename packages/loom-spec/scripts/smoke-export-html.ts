@@ -5,7 +5,7 @@
  *
  * Run: pnpm --filter loom-spec exec tsx scripts/smoke-export-html.ts
  */
-import { readFile, unlink, mkdtemp, rm } from "node:fs/promises";
+import { readFile, writeFile, unlink, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -138,6 +138,132 @@ async function main() {
       Object.keys(data3?.timelines ?? {}).length === 0
     );
     await unlink(outPath);
+
+    // ─── --include-tag public (only todo-list-view has it) ──────────
+    const out4 = execFileSync(
+      "pnpm",
+      ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+       "export-html", "--root", fixture, "--out", outPath,
+       "--include-tag", "public"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    expect("--include-tag prints filter-drop summary",
+      /Filter dropped/.test(out4), out4);
+    const html4 = await readFile(outPath, "utf8");
+    const data4 = extractLoomData(html4) as {
+      diagrams?: Record<string, { nodes: { id: string }[]; edges: unknown[]; groups?: unknown[] }>;
+      timelines?: Record<string, { events: { node: string }[] }>;
+    } | null;
+    const overview4 = data4?.diagrams?.["overview"];
+    expect("--include-tag=public retains only todo-list-view in overview",
+      overview4?.nodes.length === 1 && overview4.nodes[0]?.id === "todo-list-view");
+    expect("--include-tag drops all edges (both endpoints needed)",
+      (overview4?.edges.length ?? -1) === 0);
+    expect("--include-tag drops empty groups",
+      (overview4?.groups?.length ?? 0) === 0);
+    // todo-completion has 2 events on todo-list-view; the other 4 reference
+    // dropped nodes. Timeline survives with the 2 surviving events.
+    const tl4 = data4?.timelines?.["todo-completion"];
+    expect("--include-tag keeps timeline with surviving events",
+      !!tl4 && tl4.events.every((e) => e.node === "todo-list-view"));
+    await unlink(outPath);
+
+    // ─── --include-tag bogus → refuses to write ─────────────────────
+    let bogusFailed = false;
+    try {
+      execFileSync(
+        "pnpm",
+        ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+         "export-html", "--root", fixture, "--out", outPath,
+         "--include-tag", "this-tag-matches-nothing"],
+        { cwd: repoRoot, encoding: "utf8", stdio: "pipe" }
+      );
+    } catch {
+      bogusFailed = true;
+    }
+    expect("--include-tag matching 0 nodes exits non-zero", bogusFailed);
+
+    // ─── --exclude-tag critical-path (drops todo-list-view) ─────────
+    execFileSync(
+      "pnpm",
+      ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+       "export-html", "--root", fixture, "--out", outPath,
+       "--exclude-tag", "critical-path"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    const html5 = await readFile(outPath, "utf8");
+    const data5 = extractLoomData(html5) as {
+      diagrams?: Record<string, { nodes: { id: string }[] }>;
+    } | null;
+    const overview5 = data5?.diagrams?.["overview"];
+    expect("--exclude-tag=critical-path drops todo-list-view",
+      !overview5?.nodes.some((n) => n.id === "todo-list-view"));
+    expect("--exclude-tag keeps the other 4 nodes",
+      overview5?.nodes.length === 4);
+    await unlink(outPath);
+
+    // ─── Named bundle from .loom/exports.json ───────────────────────
+    // Write a temp config into the fixture; restore at the end.
+    const exportsPath = resolve(fixture, ".loom/exports.json");
+    const hadExisting = await stat(exportsPath).then(() => true).catch(() => false);
+    const backup = hadExisting ? await readFile(exportsPath, "utf8") : null;
+    try {
+      await writeFile(
+        exportsPath,
+        JSON.stringify(
+          {
+            exports: {
+              "user-manual": {
+                "include-tags": ["public"],
+                "no-timelines": true,
+              },
+            },
+          },
+          null,
+          2
+        ) + "\n",
+        "utf8"
+      );
+
+      execFileSync(
+        "pnpm",
+        ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+         "export-html", "user-manual", "--root", fixture, "--out", outPath],
+        { cwd: repoRoot, encoding: "utf8" }
+      );
+      const html6 = await readFile(outPath, "utf8");
+      const data6 = extractLoomData(html6) as {
+        diagrams?: Record<string, { nodes: { id: string }[] }>;
+        timelines?: Record<string, unknown>;
+      } | null;
+      const overview6 = data6?.diagrams?.["overview"];
+      expect("named bundle applies include-tags filter",
+        overview6?.nodes.length === 1 &&
+          overview6.nodes[0]?.id === "todo-list-view");
+      expect("named bundle applies no-timelines",
+        Object.keys(data6?.timelines ?? {}).length === 0);
+      await unlink(outPath);
+
+      // Bundle not found
+      let unknownBundleFailed = false;
+      try {
+        execFileSync(
+          "pnpm",
+          ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+           "export-html", "no-such-bundle", "--root", fixture, "--out", outPath],
+          { cwd: repoRoot, encoding: "utf8", stdio: "pipe" }
+        );
+      } catch {
+        unknownBundleFailed = true;
+      }
+      expect("unknown bundle name exits non-zero", unknownBundleFailed);
+    } finally {
+      if (backup !== null) {
+        await writeFile(exportsPath, backup, "utf8");
+      } else {
+        await unlink(exportsPath).catch(() => {});
+      }
+    }
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }

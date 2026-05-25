@@ -11,15 +11,26 @@ individual nodes.
 ## Usage
 
 ```sh
-loom-spec export-html [--out <path>] [--diagram <id>] [--no-timelines] [--root <dir>]
+loom-spec export-html [<bundle-name>]
+                      [--out <path>] [--diagram <id>] [--no-timelines]
+                      [--include-tag <comma-list>] [--exclude-tag <comma-list>]
+                      [--root <dir>]
 ```
 
+- `<bundle-name>` — optional first positional arg. Resolves settings from
+  a named export in `.loom/exports.json` (see [Named bundles](#named-bundles)).
 - `--out` — output file path. Default: `loom.html` in cwd.
 - `--diagram` — only this diagram, plus any timelines that reference it.
   Omit for a full export.
 - `--no-timelines` — skip all timelines. Useful for manuals that only
   need the static architecture diagrams.
+- `--include-tag` — comma-separated list. Only nodes whose `tags` field
+  includes at least one of these survive. Default: keep all nodes.
+- `--exclude-tag` — comma-separated list. Drop any node whose `tags`
+  includes one of these. Default: drop nothing.
 - `--root` — walk up from this directory to find `.loom/`. Defaults to cwd.
+
+CLI flags override values set in a named bundle.
 
 ## Output
 
@@ -117,14 +128,109 @@ If the spec is part of your repo and the export is in `docs/`, wire
 this into your docs build step or a pre-commit hook so the published
 file never drifts from the source.
 
-## What about scoped / public-only exports?
+## Scoped / public-only exports — tags
 
-Coming in a follow-up (backlog #29 + #30): tag-based filtering
-(`--include-tag public`) and named bundles via `.loom/exports.json`. For
-now, the only scope tool is `--diagram <id>` to pick a single diagram.
-If you need to hide internal services from a public manual, the
-workaround is to maintain them in a separate diagram and export only
-the public one.
+Most architectures have parts you want in a public manual and parts you
+don't (internal services, security-sensitive paths, work-in-progress).
+Use the `tags` field on nodes to mark them, then filter on export.
+
+```sh
+# Author flow (or via MCP / hand-editing JSON):
+# Tag nodes that belong in the public manual.
+loom_update_node({
+  diagram: "overview",
+  id: "checkout-flow",
+  patch: { tags: ["public"] }
+})
+
+# Then at export time:
+loom-spec export-html --include-tag public --out user-manual.html
+```
+
+### Filter semantics
+
+A node survives iff:
+
+- (`--include-tag` is unset OR the node has at least one matching tag)
+  AND
+- (`--exclude-tag` is unset OR the node has none of those tags)
+
+So `--include-tag public` is an **allowlist** (untagged = hidden);
+`--exclude-tag wip` is a **blocklist** (only the explicitly-tagged is
+hidden); the two combine naturally.
+
+### Cascade rules (what happens to the rest of the graph)
+
+When a node is dropped, everything that depended on it is cleaned up
+automatically — no dangling references in the export:
+
+1. **Edges**: drop any edge whose source or target was dropped.
+2. **Groups**: shrink to surviving children; if all children were dropped,
+   drop the group.
+3. **Drill-down chevrons**: if a node's `drill_down` points at a diagram
+   with zero surviving nodes after filtering, clear the chevron (the
+   diagram still ships, but the link goes away). Same for group drill-downs.
+4. **Timeline events**: drop events whose referenced node was dropped.
+5. **Timelines**: if a timeline ends up with zero events, drop the
+   timeline entirely.
+6. **`triggered_by`**: scrub references pointing at dropped events.
+
+The CLI prints a summary line after exporting (`Filter dropped: 3 nodes,
+4 edges, 1 group.`) so you can sanity-check what you're shipping.
+
+### Security warning
+
+Tags are a coarse instrument. They filter **nodes**, not their content.
+If a node is tagged `public` but its `code_refs[].path` points at
+`src/server/admin/secrets.ts`, that path string ships in the export.
+
+Before tagging `public`, check:
+
+- `code_refs[]` paths don't expose internal directory structure you
+  consider sensitive.
+- `description` and `properties` don't reference internal systems by
+  name in a way that gives away your architecture.
+
+If you need to expose a node but hide a `code_ref`, split into two nodes
+(public + internal) or remove that ref from the public one.
+
+## Named bundles
+
+Most teams have a handful of recurring export configurations
+(`user-manual`, `ops-runbook`, `internal-overview`). Versioning those in
+the repo via `.loom/exports.json` means everyone — humans, agents, CI —
+produces the same output without remembering CLI flags.
+
+### Schema
+
+```json
+{
+  "exports": {
+    "user-manual": {
+      "include-tags": ["public"],
+      "exclude-tags": ["wip"],
+      "diagram": "overview",
+      "no-timelines": true,
+      "out": "docs/architecture.html"
+    },
+    "ops-runbook": {
+      "include-tags": ["ops"]
+    }
+  }
+}
+```
+
+All fields are optional. Unknown keys are tolerated for forward-compat.
+
+### Use
+
+```sh
+loom-spec export-html user-manual              # uses bundle as-is
+loom-spec export-html user-manual --out /tmp/preview.html  # override out
+```
+
+CLI flags override the bundle's values. Useful for previews
+(`--out /tmp/...`) or one-off variations.
 
 ## Testing
 

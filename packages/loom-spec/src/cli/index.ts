@@ -5,7 +5,7 @@ import { runValidate } from "./validate.js";
 import { runMcp } from "./mcp.js";
 import { runInstallMcp } from "./installMcp.js";
 import { runImportTrace } from "./importTrace.js";
-import { runExportHtml } from "./exportHtml.js";
+import { runExportHtml, DEFAULT_OUT as EXPORT_DEFAULT_OUT } from "./exportHtml.js";
 
 const HELP = `loom-spec — node-based architecture spec for your repo
 
@@ -35,13 +35,22 @@ Usage:
       and timelines (loom_list_timelines, loom_add_event, …) — wire it
       into Claude Code's mcp.json (or any MCP-capable client).
 
-  loom-spec export-html [--out <path>] [--diagram <id>] [--no-timelines]
+  loom-spec export-html [<bundle-name>] [--out <path>] [--diagram <id>]
+                        [--no-timelines]
+                        [--include-tag <comma-list>] [--exclude-tag <comma-list>]
                         [--root <dir>]
       Build a standalone interactive HTML file from the spec — pan/zoom,
       drill-down, switch diagrams, play timelines. Single self-contained
       file, no server needed. Drop it into a manual, wiki, GitHub Pages
       site, anywhere. Output defaults to ./loom.html. With --diagram, only
-      that diagram (and timelines referencing it) ship.
+      that diagram (and timelines referencing it) ship. With
+      --include-tag / --exclude-tag, only nodes whose 'tags' match
+      survive — edges, groups, drill-down chevrons, timeline events that
+      point at dropped nodes are cleaned up automatically.
+
+      Pass a <bundle-name> as the first positional arg to read settings
+      from a named bundle in .loom/exports.json. Explicit flags override
+      the bundle's values.
 
   loom-spec import-trace <trace.json> --as <timeline-id> --diagram <diagram-id>
                         [--map <mapping.json>] [--append] [--root <dir>]
@@ -57,6 +66,7 @@ Usage:
 
 function parseFlags(argv: string[]) {
   const flags: Record<string, string | boolean> = {};
+  const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a) continue;
@@ -69,14 +79,16 @@ function parseFlags(argv: string[]) {
       } else {
         flags[key] = true;
       }
+    } else {
+      positional.push(a);
     }
   }
-  return flags;
+  return { flags, positional };
 }
 
 async function main() {
   const [, , subcommand, ...rest] = process.argv;
-  const flags = parseFlags(rest);
+  const { flags, positional } = parseFlags(rest);
 
   if (!subcommand || subcommand === "--help" || subcommand === "-h") {
     console.log(HELP);
@@ -124,18 +136,28 @@ async function main() {
   }
 
   if (subcommand === "export-html") {
+    const splitTags = (v: unknown): string[] | undefined => {
+      if (typeof v !== "string" || !v.trim()) return undefined;
+      return v.split(",").map((s) => s.trim()).filter(Boolean);
+    };
+    // First positional arg, if any, is a named-bundle key from
+    // .loom/exports.json (e.g. `loom-spec export-html user-manual`).
+    const bundle = positional[0];
     await runExportHtml({
-      out: (flags.out as string) ?? "loom.html",
+      out: (flags.out as string) ?? EXPORT_DEFAULT_OUT,
       root: (flags.root as string) ?? process.cwd(),
       diagram: typeof flags.diagram === "string" ? flags.diagram : undefined,
       noTimelines: Boolean(flags["no-timelines"]),
+      includeTags: splitTags(flags["include-tag"]),
+      excludeTags: splitTags(flags["exclude-tag"]),
+      bundle,
     });
     return;
   }
 
   if (subcommand === "import-trace") {
-    // Positional arg: the trace file path (first non-flag in rest).
-    const trace = rest.find((a) => a && !a.startsWith("--"));
+    // Positional arg: the trace file path.
+    const trace = positional[0];
     if (!trace) {
       console.error("import-trace: missing trace file path");
       console.log(HELP);

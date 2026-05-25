@@ -59,6 +59,38 @@ For any task that touches structure:
   `<name>.flow.json` instead of cramming it into an existing diagram.
 - Link from the overview with a `drill_down` reference if appropriate.
 
+### Tagging hygiene for exports
+
+`loom-spec export-html` filters by node `tags` to produce scoped bundles
+(public manual, ops runbook, internal overview). Tagging is the source
+of truth for what ships where. Conventions:
+
+- **`public`** — shows up in user-facing documentation. Default-off
+  (untagged nodes are *not* in public exports).
+- **`internal`** — explicitly internal; can be used as `--exclude-tag`
+  for public exports, or as `--include-tag` for an internal-only bundle.
+- **`ops`** — for operational runbooks (deploy paths, monitoring,
+  on-call docs).
+- **`wip`** — work-in-progress; always exclude from any export.
+
+When you set `tags: ["public"]` on a node, remember the cascade:
+
+- Edges between two `public` nodes survive. Edges where one endpoint is
+  untagged are **dropped** in the public export. If the user-facing
+  flow depends on an "internal" node visually, either tag that node
+  `public` too or accept the dangling visualisation.
+- A group with no `public` children disappears entirely.
+- A `drill_down` chevron pointing at a diagram that has zero `public`
+  nodes is removed (the diagram doesn't ship).
+
+**Security check before tagging `public`:** look at the node's
+`code_refs[].path` and `description`. Tags filter nodes, not their
+content. If a `code_ref` points at `src/server/admin/secrets.ts` or
+the description names an internal system, that *text* ships in the
+public export. Either remove the sensitive ref / rewrite the
+description, or split the node into a public surface and an internal
+implementation node and tag accordingly.
+
 ## Preferred tools (when the MCP server is wired up)
 
 If a `loom-spec` MCP server is registered with the host (e.g. via
@@ -77,6 +109,16 @@ re-reading + re-writing JSON on every mutation.
 
 If the MCP server is not available, edit the JSON files directly using the
 rules above — the format is stable and tools-agnostic by design.
+
+For exporting the spec to a self-contained interactive HTML (for manuals,
+docs sites, GitHub Pages, embed-in-Notion, etc.), use the CLI:
+
+- `loom-spec export-html` (full export)
+- `loom-spec export-html <bundle-name>` (from `.loom/exports.json`)
+- `loom-spec export-html --include-tag public --no-timelines --out manual.html`
+  (ad-hoc filter)
+
+See Example 7 for the full workflow.
 
 ---
 
@@ -338,6 +380,67 @@ loom_validate()
 **Don't create a timeline for static structure** — that's what diagrams are
 for. A timeline of "the app boots, then runs forever" adds noise.
 
+### 7. User wants to publish architecture docs to a manual
+
+> User: "We need to ship the checkout flow as an interactive diagram in
+> our public user manual. Don't expose anything internal."
+
+```
+# Step 1: Identify which nodes belong in the public manual.
+loom_read_diagram("overview")
+# → review nodes; confirm with the user if scope is unclear
+
+# Step 2: Tag the public-facing surface. Skip anything that exposes
+# internal services, security-sensitive paths, or work-in-progress.
+loom_update_node({ diagram: "overview", id: "checkout-page",
+                   patch: { tags: ["public"] } })
+loom_update_node({ diagram: "overview", id: "checkout-api",
+                   patch: { tags: ["public"] } })
+loom_update_node({ diagram: "overview", id: "payments-service",
+                   patch: { tags: ["public"] } })
+# … but NOT fraud-screening, admin-tools, internal-billing, etc.
+
+# Step 3: Verify the tag set covers a connected slice. Edges between
+# two public nodes survive; edges to untagged neighbours get dropped
+# in the export. If the export would have orphans, either tag the
+# missing neighbour or accept that the link disappears.
+
+# Step 4: Write a named bundle to .loom/exports.json so the export is
+# reproducible. (No MCP tool for this yet — write the file directly.)
+#
+# .loom/exports.json
+{
+  "exports": {
+    "user-manual": {
+      "include-tags": ["public"],
+      "exclude-tags": ["wip"],
+      "no-timelines": true,
+      "out": "docs/architecture.html"
+    }
+  }
+}
+
+# Step 5: Generate the HTML.
+# (Shell, not MCP — agents can invoke via Bash tool or similar.)
+$ loom-spec export-html user-manual
+
+# Step 6: Sanity-check the output. Open docs/architecture.html in a
+# browser and confirm: no internal node names visible, no surprising
+# code_refs paths leaked in the inspector, the flow makes sense as a
+# standalone visualisation.
+```
+
+**When to use timelines vs not in an export:**
+
+- Static manual / API reference → `--no-timelines` (the topology is the
+  story). Smaller file, less to digest.
+- Onboarding / "how does the checkout actually run" → keep timelines so
+  the reader can hit Play.
+
+**Don't auto-publish** — the export is intentional. A `git add` of the
+generated `.html` belongs in the change that updates the architecture,
+not in an automated commit triggered by every `.loom/` edit.
+
 ---
 
 ## Format reference
@@ -364,3 +467,11 @@ for. A timeline of "the app boots, then runs forever" adds noise.
   **flow**.
 - Don't leave `drill_down` pointing at a non-existent diagram id.
 - Don't `loom_delete_node` for code that was just removed — `mark_stale` it.
+- Don't tag everything `public` "just in case" — the value of a tag is
+  that it means something. If `public` is on every node, scoped exports
+  stop being scoped.
+- Don't manually edit the generated `.html` from `export-html` — re-run
+  the export instead. Edits to the generated file are lost on the next
+  run and obscure the source of truth.
+- Don't add `loom-spec export-html` to `init` defaults or auto-run it
+  from a hook. Exports are intentional, not background.

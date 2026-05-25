@@ -9,6 +9,8 @@ import {
   readTimeline,
   readNodeTypes,
 } from "../server/fileOps.js";
+import { applyFilter, type FilterSpec } from "../server/exportFilter.js";
+import { loadExportsConfig } from "../server/exportConfig.js";
 import type { LoomDiagram } from "../types/diagram.js";
 import type { LoomTimeline } from "../types/timeline.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
@@ -23,6 +25,13 @@ export interface ExportHtmlArgs {
   /** Skip all timelines. Useful for manuals where the static topology is
    *  the whole story. */
   noTimelines: boolean;
+  /** Only export nodes carrying at least one of these tags. */
+  includeTags?: string[];
+  /** Drop nodes carrying any of these tags. */
+  excludeTags?: string[];
+  /** Named bundle from .loom/exports.json. Settings from the bundle become
+   *  defaults; explicit CLI flags override. */
+  bundle?: string;
 }
 
 interface ExportData {
@@ -61,6 +70,13 @@ async function findExportBundle(): Promise<string> {
       `Did you run 'pnpm build' (or 'pnpm build:export') to produce dist/view-export?`
   );
 }
+
+/**
+ * Used by the bundle-merge logic to tell "user passed --out" from "we are
+ * using the default". Exported so the CLI dispatcher can default-init the
+ * field once and stay consistent with this module's notion of "default".
+ */
+export const DEFAULT_OUT = "loom.html";
 
 async function loadAllData(args: ExportHtmlArgs): Promise<ExportData> {
   const loomRoot = await findLoomRoot(args.root);
@@ -156,6 +172,39 @@ function escapeHtml(s: string): string {
 }
 
 export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
+  // If a bundle name was given, resolve its settings from .loom/exports.json
+  // first. Explicit CLI args take precedence (for ad-hoc overrides).
+  let effective = args;
+  if (args.bundle) {
+    const loomRoot = await findLoomRoot(args.root);
+    const config = await loadExportsConfig(loomRoot.loomPath);
+    if (!config) {
+      console.error(
+        `export-html: no .loom/exports.json found, but '${args.bundle}' looks like a named bundle.\n` +
+          `  Create .loom/exports.json with an 'exports.${args.bundle}' entry, or pass ad-hoc flags instead.`
+      );
+      process.exit(1);
+    }
+    const bundle = config.exports[args.bundle];
+    if (!bundle) {
+      const available = Object.keys(config.exports).sort().join(", ") || "(none)";
+      console.error(
+        `export-html: bundle '${args.bundle}' not found in .loom/exports.json. ` +
+          `Available: ${available}.`
+      );
+      process.exit(1);
+    }
+    // Merge: explicit CLI args (in `args`) override config-supplied values.
+    effective = {
+      ...args,
+      out: args.out !== DEFAULT_OUT ? args.out : bundle.out ?? args.out,
+      diagram: args.diagram ?? bundle.diagram,
+      noTimelines: args.noTimelines || (bundle.noTimelines ?? false),
+      includeTags: args.includeTags ?? bundle.includeTags,
+      excludeTags: args.excludeTags ?? bundle.excludeTags,
+    };
+  }
+
   const bundleDir = await findExportBundle();
   const [bundleHtml, bundleCss, bundleJs] = await Promise.all([
     readFile(resolve(bundleDir, "index.html"), "utf8"),
@@ -163,28 +212,72 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
     readFile(resolve(bundleDir, "assets/bundle.js"), "utf8"),
   ]);
 
-  const data = await loadAllData(args);
+  const data = await loadAllData(effective);
 
   if (Object.keys(data.diagrams).length === 0) {
     console.error("export-html: no diagrams found — refusing to write an empty export.");
     process.exit(1);
   }
 
-  const html = buildHtml(bundleHtml, bundleCss, bundleJs, data, {
-    sourceRoot: args.root,
+  const filterSpec: FilterSpec = {
+    includeTags: effective.includeTags,
+    excludeTags: effective.excludeTags,
+  };
+  const { payload: filtered, summary } = applyFilter(data, filterSpec);
+
+  // After filtering, if everything's gone, bail. Better to fail loud than
+  // silently emit a blank HTML the user will wonder about.
+  const survivingNodes = Object.values(filtered.diagrams).reduce(
+    (n, d) => n + d.nodes.length,
+    0
+  );
+  if (survivingNodes === 0) {
+    console.error(
+      "export-html: filter matched 0 nodes — refusing to write an empty export."
+    );
+    if (filterSpec.includeTags?.length || filterSpec.excludeTags?.length) {
+      console.error(
+        `  filter was: include=[${(filterSpec.includeTags ?? []).join(", ")}], ` +
+          `exclude=[${(filterSpec.excludeTags ?? []).join(", ")}]`
+      );
+    }
+    process.exit(1);
+  }
+
+  const finalData: ExportData = {
+    ...data,
+    diagrams: filtered.diagrams,
+    timelines: filtered.timelines,
+  };
+
+  const html = buildHtml(bundleHtml, bundleCss, bundleJs, finalData, {
+    sourceRoot: effective.root,
   });
 
-  const outPath = resolve(args.out);
+  const outPath = resolve(effective.out);
   await writeFile(outPath, html, "utf8");
 
   const sizeKb = Math.round(Buffer.byteLength(html, "utf8") / 1024);
-  const diagramCount = Object.keys(data.diagrams).length;
-  const timelineCount = Object.keys(data.timelines).length;
+  const diagramCount = Object.keys(finalData.diagrams).length;
+  const timelineCount = Object.keys(finalData.timelines).length;
   console.log(
     `Wrote ${outPath} (${sizeKb} kB): ` +
       `${diagramCount} diagram${diagramCount === 1 ? "" : "s"}, ` +
       `${timelineCount} timeline${timelineCount === 1 ? "" : "s"}.`
   );
+  const droppedParts: string[] = [];
+  if (summary.nodesDropped > 0) droppedParts.push(`${summary.nodesDropped} nodes`);
+  if (summary.edgesDropped > 0) droppedParts.push(`${summary.edgesDropped} edges`);
+  if (summary.groupsDropped > 0) droppedParts.push(`${summary.groupsDropped} groups`);
+  if (summary.eventsDropped > 0)
+    droppedParts.push(`${summary.eventsDropped} events`);
+  if (summary.timelinesDropped > 0)
+    droppedParts.push(`${summary.timelinesDropped} timelines`);
+  if (summary.drillDownsCleared > 0)
+    droppedParts.push(`${summary.drillDownsCleared} drill-down refs`);
+  if (droppedParts.length > 0) {
+    console.log(`Filter dropped: ${droppedParts.join(", ")}.`);
+  }
   console.log(
     `Open it directly in a browser, or drop it into any docs / wiki / GitHub-Pages site.`
   );
