@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoomDiagram, Node as LoomNode, Edge as LoomEdge } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
 import { loadDiagram, saveDiagram } from "./loadDiagram";
+import { isExportMode } from "./exportMode";
 import { validateDiagramClient, type ValidationError } from "./validate-client";
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
@@ -63,8 +64,10 @@ export function useDiagramState(id: string) {
     };
   }, [id]);
 
-  // Debounced save
+  // Debounced save. In export mode the schedule is a no-op so we don't
+  // generate spurious save-error UI when there's no server to receive PUTs.
   const scheduleSave = useCallback(() => {
+    if (isExportMode()) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setState((s) => ({ ...s, saveStatus: "dirty", saveError: null }));
     saveTimer.current = setTimeout(async () => {
@@ -163,8 +166,13 @@ export function useDiagramState(id: string) {
   );
 
   // Subscribe to server-sent events for live updates from other writers
-  // (e.g. an AI agent editing the JSON while the UI is open).
+  // (e.g. an AI agent editing the JSON while the UI is open). Skipped in
+  // export mode — the standalone HTML has no /api/events to subscribe to.
   useEffect(() => {
+    if (isExportMode()) {
+      setState((s) => ({ ...s, connectionStatus: "connected" }));
+      return;
+    }
     setState((s) => ({ ...s, connectionStatus: "connecting" }));
     const es = new EventSource("/api/events");
 

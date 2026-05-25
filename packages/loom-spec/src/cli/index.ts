@@ -5,6 +5,7 @@ import { runValidate } from "./validate.js";
 import { runMcp } from "./mcp.js";
 import { runInstallMcp } from "./installMcp.js";
 import { runImportTrace } from "./importTrace.js";
+import { runExportHtml } from "./exportHtml.js";
 
 const HELP = `loom-spec — node-based architecture spec for your repo
 
@@ -33,6 +34,14 @@ Usage:
       for diagrams (loom_list_diagrams, loom_add_node, loom_add_edge, …)
       and timelines (loom_list_timelines, loom_add_event, …) — wire it
       into Claude Code's mcp.json (or any MCP-capable client).
+
+  loom-spec export-html [--out <path>] [--diagram <id>] [--no-timelines]
+                        [--root <dir>]
+      Build a standalone interactive HTML file from the spec — pan/zoom,
+      drill-down, switch diagrams, play timelines. Single self-contained
+      file, no server needed. Drop it into a manual, wiki, GitHub Pages
+      site, anywhere. Output defaults to ./loom.html. With --diagram, only
+      that diagram (and timelines referencing it) ship.
 
   loom-spec import-trace <trace.json> --as <timeline-id> --diagram <diagram-id>
                         [--map <mapping.json>] [--append] [--root <dir>]
@@ -110,6 +119,16 @@ async function main() {
   if (subcommand === "mcp") {
     await runMcp({
       root: (flags.root as string) ?? process.cwd(),
+    });
+    return;
+  }
+
+  if (subcommand === "export-html") {
+    await runExportHtml({
+      out: (flags.out as string) ?? "loom.html",
+      root: (flags.root as string) ?? process.cwd(),
+      diagram: typeof flags.diagram === "string" ? flags.diagram : undefined,
+      noTimelines: Boolean(flags["no-timelines"]),
     });
     return;
   }

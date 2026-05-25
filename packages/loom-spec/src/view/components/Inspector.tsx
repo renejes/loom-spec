@@ -17,8 +17,10 @@ interface Props {
   selectedEdge: LoomEdge | null;
   nodeTypes: LoomNodeTypes;
   validationErrors: ValidationError[];
-  onUpdateNode: (id: string, updater: (n: LoomNode) => LoomNode) => void;
-  onUpdateEdge: (id: string, updater: (e: LoomEdge) => LoomEdge) => void;
+  /** Pass `undefined` for read-only mode (exported HTML). Inputs render but
+   *  edits are dropped silently. */
+  onUpdateNode?: (id: string, updater: (n: LoomNode) => LoomNode) => void;
+  onUpdateEdge?: (id: string, updater: (e: LoomEdge) => LoomEdge) => void;
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -77,8 +79,9 @@ function NodeInspector({
   const tags = node.tags ?? [];
   const errors = errorsForNode(validationErrors, node.id);
 
-  const update = (updater: (n: LoomNode) => LoomNode) =>
-    onUpdateNode(node.id, updater);
+  const update = (updater: (n: LoomNode) => LoomNode) => {
+    onUpdateNode?.(node.id, updater);
+  };
 
   const updateProp = (name: string, value: unknown) =>
     update((n) => ({
@@ -254,8 +257,9 @@ function EdgeInspector({
   validationErrors,
   onUpdateEdge,
 }: Props & { edge: LoomEdge }) {
-  const update = (updater: (e: LoomEdge) => LoomEdge) =>
-    onUpdateEdge(edge.id, updater);
+  const update = (updater: (e: LoomEdge) => LoomEdge) => {
+    onUpdateEdge?.(edge.id, updater);
+  };
   const errors = errorsForEdge(validationErrors, edge.id);
 
   return (

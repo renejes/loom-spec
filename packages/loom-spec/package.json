@@ -47,7 +47,8 @@
     "./node-types-schema": "./schema/node-types.schema.json"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts",
+    "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts && vite build --config src/view/vite.config.export.ts",
+    "build:export": "vite build --config src/view/vite.config.export.ts",
     "dev": "concurrently -n server,view -c blue,magenta \"pnpm dev:server\" \"pnpm dev:view\"",
     "dev:server": "tsx src/cli/index.ts view --dev --root ../../examples/todo-app --port 7778",
     "dev:view": "vite --config src/view/vite.config.ts",

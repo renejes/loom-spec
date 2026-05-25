@@ -21,7 +21,7 @@ interface Props {
   isDefault: boolean;
   onClickHome: () => void;
   onNavigate: (view: ViewState) => void;
-  onCreateDiagram: () => void;
+  onCreateDiagram?: () => void;
   addButtonRef: React.RefObject<HTMLButtonElement> | null;
   hideAddButton?: boolean;
 }

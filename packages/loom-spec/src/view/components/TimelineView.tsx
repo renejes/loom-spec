@@ -7,6 +7,7 @@ import { TransportBar } from "./TransportBar";
 import { DiagramCanvas } from "./DiagramCanvas";
 import { AddEventMenu } from "./AddEventMenu";
 import { useTimelineState, uniqueEventId } from "../useTimelineState";
+import { isExportMode } from "../exportMode";
 import type { ViewState } from "../useViewState";
 import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
 import type { TimelineEvent } from "../../types/timeline";
@@ -35,6 +36,7 @@ export function TimelineView({
   const [addOpen, setAddOpen] = useState(false);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const [zoom, setZoom] = useState(1);
+  const exportMode = isExportMode();
 
   // ─── Playback state (transient, not persisted) ──────────────────
   const [positionMs, setPositionMs] = useState(0);
@@ -163,7 +165,11 @@ export function TimelineView({
       } else if (e.key === "Home") {
         e.preventDefault();
         onReset();
-      } else if ((e.key === "Backspace" || e.key === "Delete") && selectedId) {
+      } else if (
+        (e.key === "Backspace" || e.key === "Delete") &&
+        selectedId &&
+        !exportMode
+      ) {
         e.preventDefault();
         state.deleteEvent(selectedId);
         setSelectedId(null);
@@ -171,7 +177,7 @@ export function TimelineView({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onPlayPause, onReset, selectedId, state]);
+  }, [onPlayPause, onReset, selectedId, state, exportMode]);
 
   if (state.loadError) {
     return (
@@ -243,14 +249,16 @@ export function TimelineView({
         onSpeed={setSpeed}
         actions={
           <>
-            <button
-              ref={addButtonRef}
-              className="transport-add-event"
-              onClick={() => setAddOpen((v) => !v)}
-              title="Add event at playhead"
-            >
-              <Plus size={14} /> Event
-            </button>
+            {!exportMode && (
+              <button
+                ref={addButtonRef}
+                className="transport-add-event"
+                onClick={() => setAddOpen((v) => !v)}
+                title="Add event at playhead"
+              >
+                <Plus size={14} /> Event
+              </button>
+            )}
             <label className="transport-zoom">
               <span className="muted">Zoom</span>
               <select
@@ -267,7 +275,7 @@ export function TimelineView({
           </>
         }
       />
-      {addOpen && (
+      {addOpen && !exportMode && (
         <AddEventMenu
           diagram={state.diagram}
           nodeTypes={state.nodeTypes}
@@ -285,7 +293,7 @@ export function TimelineView({
               nodeTypes={state.nodeTypes}
               selectedEventId={selectedId}
               onSelectEvent={setSelectedId}
-              onUpdateEvent={state.updateEvent}
+              onUpdateEvent={exportMode ? undefined : state.updateEvent}
               playheadMs={positionMs}
               onScrub={onScrub}
               zoom={zoom}

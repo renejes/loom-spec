@@ -10,7 +10,7 @@ interface Props {
   diagrams: DiagramSummary[];
   timelines: TimelineSummary[];
   onNavigate: (view: ViewState) => void;
-  onCreate: () => void;
+  onCreate?: () => void;
 }
 
 export function DiagramSwitcher({
@@ -103,17 +103,21 @@ export function DiagramSwitcher({
             </>
           )}
 
-          <div className="switcher-divider" />
-          <button
-            className="switcher-item new"
-            onClick={() => {
-              onCreate();
-              setOpen(false);
-            }}
-          >
-            <Plus size={13} className="switcher-item-icon" />
-            <span>New diagram…</span>
-          </button>
+          {onCreate && (
+            <>
+              <div className="switcher-divider" />
+              <button
+                className="switcher-item new"
+                onClick={() => {
+                  onCreate();
+                  setOpen(false);
+                }}
+              >
+                <Plus size={13} className="switcher-item-icon" />
+                <span>New diagram…</span>
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

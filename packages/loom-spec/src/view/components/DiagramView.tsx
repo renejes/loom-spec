@@ -5,6 +5,7 @@ import { Inspector } from "./Inspector";
 import { AddNodeMenu } from "./AddNodeMenu";
 import { useDiagramState, uniqueNodeId } from "../state";
 import { createEmptyDiagram } from "../loadDiagram";
+import { isExportMode } from "../exportMode";
 import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
 import type { Node as LoomNode } from "../../types/diagram";
 import type { ViewState } from "../useViewState";
@@ -37,6 +38,7 @@ export function DiagramView({
   const [selection, setSelection] = useState<Selection>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const exportMode = isExportMode();
 
   // Reset selection / close menus on navigation so the inspector doesn't
   // hold onto an id that no longer exists in the new diagram.
@@ -154,10 +156,11 @@ export function DiagramView({
         isDefault={isDefault}
         onClickHome={onClickHome}
         onNavigate={navigateAndReset}
-        onCreateDiagram={handleCreateDiagram}
+        onCreateDiagram={exportMode ? undefined : handleCreateDiagram}
         addButtonRef={addButtonRef}
+        hideAddButton={exportMode}
       />
-      {addMenuOpen && (
+      {addMenuOpen && !exportMode && (
         <AddNodeMenu
           nodeTypes={state.nodeTypes}
           anchorRef={addButtonRef}
@@ -170,31 +173,43 @@ export function DiagramView({
         nodeTypesConfig={state.nodeTypes}
         selection={selection}
         onSelect={setSelection}
-        onMoveNode={(nodeId, position) =>
-          state.updateNode(nodeId, (n) => ({ ...n, position }))
+        onMoveNode={
+          exportMode
+            ? undefined
+            : (nodeId, position) =>
+                state.updateNode(nodeId, (n) => ({ ...n, position }))
         }
-        onDeleteNode={(nodeId) => {
-          state.deleteNode(nodeId);
-          if (selection?.kind === "node" && selection.id === nodeId)
-            setSelection(null);
-        }}
-        onDeleteEdge={(edgeId) => {
-          state.deleteEdge(edgeId);
-          if (selection?.kind === "edge" && selection.id === edgeId)
-            setSelection(null);
-        }}
-        onAddEdge={state.addEdge}
+        onDeleteNode={
+          exportMode
+            ? undefined
+            : (nodeId) => {
+                state.deleteNode(nodeId);
+                if (selection?.kind === "node" && selection.id === nodeId)
+                  setSelection(null);
+              }
+        }
+        onDeleteEdge={
+          exportMode
+            ? undefined
+            : (edgeId) => {
+                state.deleteEdge(edgeId);
+                if (selection?.kind === "edge" && selection.id === edgeId)
+                  setSelection(null);
+              }
+        }
+        onAddEdge={exportMode ? undefined : state.addEdge}
         onDrillDown={(diagramId) =>
           navigateAndReset({ kind: "diagram", id: diagramId })
         }
+        interactive={!exportMode}
       />
       <Inspector
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
         nodeTypes={state.nodeTypes}
         validationErrors={state.validationErrors}
-        onUpdateNode={state.updateNode}
-        onUpdateEdge={state.updateEdge}
+        onUpdateNode={exportMode ? undefined : state.updateNode}
+        onUpdateEdge={exportMode ? undefined : state.updateEdge}
       />
     </div>
   );

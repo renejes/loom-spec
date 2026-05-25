@@ -17,6 +17,12 @@
         "examples/todo-app"
       ],
       "port": 7777
+    },
+    {
+      "name": "loom-export-verify",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/tmp/loom-export-verify"],
+      "port": 8765
     }
   ]
 }

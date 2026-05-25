@@ -3,6 +3,7 @@ import type { LoomTimeline, TimelineEvent } from "../types/timeline";
 import type { LoomDiagram } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
 import { loadDiagram, loadTimeline, saveTimeline } from "./loadDiagram";
+import { isExportMode } from "./exportMode";
 import type { ConnectionStatus, SaveStatus } from "./state";
 
 interface TimelineStateInternal {
@@ -74,8 +75,9 @@ export function useTimelineState(id: string) {
     };
   }, [id]);
 
-  // Debounced auto-save
+  // Debounced auto-save. No-op in export mode.
   const scheduleSave = useCallback(() => {
+    if (isExportMode()) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setState((s) => ({ ...s, saveStatus: "dirty", saveError: null }));
     saveTimer.current = setTimeout(async () => {
@@ -137,8 +139,13 @@ export function useTimelineState(id: string) {
     [updateTimeline]
   );
 
-  // SSE — refetch on external changes, but don't clobber unsaved local edits
+  // SSE — refetch on external changes, but don't clobber unsaved local
+  // edits. Skipped in export mode (no server).
   useEffect(() => {
+    if (isExportMode()) {
+      setState((s) => ({ ...s, connectionStatus: "connected" }));
+      return;
+    }
     setState((s) => ({ ...s, connectionStatus: "connecting" }));
     const es = new EventSource("/api/events");
 
