@@ -101,7 +101,7 @@ For internals — architecture, data flow, what's verified — see [documentatio
 
 ## Status
 
-`v0.2.0` on npm; a v0.3.0 release is queued on `main` covering the `+ Event` button, horizontal timeline zoom, code-split, and the `loom-spec import-trace` CLI for OpenTelemetry traces. Phase 1 + Phase 2 are feature-complete end-to-end — diagram editor, schema, MCP server (15 tools), timeline view (edit, playback, mini graph, edge pulse), and trace import. The backlog at [documentation/next-steps.md](documentation/next-steps.md) is mostly polish: editable timeline inspector, planned-vs-observed diff view, sticky labels at high zoom, pure-SVG mini renderer, more trace formats, and the kind of feedback that only shows up under real-world use.
+`v0.4.0` on npm. Phase 1 (diagram editor + MCP) + Phase 2 (timeline view with edit, playback, mini graph, edge pulse, OTel trace import, +Event button, zoom, code-split) + Phase 3 (standalone interactive HTML export with tag-based filter + named bundles) all shipped. **First real-world adoption confirmed.** Next planned chunk: **Journeys** — a separate file kind for ordered, untimed workflow documentation (see [documentation/journeys-plan.md](documentation/journeys-plan.md)). The remaining backlog at [documentation/next-steps.md](documentation/next-steps.md) is mostly polish.
 
 [CHANGELOG via GitHub releases](https://github.com/renejes/loom-spec/releases).
 
