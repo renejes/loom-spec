@@ -6,11 +6,8 @@ import {
   readDiagram,
   writeDiagram,
   readNodeTypes,
-  listTimelines,
-  readTimeline,
-  writeTimeline,
 } from "../server/fileOps.js";
-import { validateDiagram, validateTimeline } from "../validate.js";
+import { validateDiagram } from "../validate.js";
 import { runDriftCheck } from "../server/drift.js";
 import type { LoomRoot } from "../server/findLoomRoot.js";
 import type {
@@ -18,10 +15,6 @@ import type {
   Node as LoomNode,
   Edge as LoomEdge,
 } from "../types/diagram.js";
-import type {
-  LoomTimeline,
-  TimelineEvent,
-} from "../types/timeline.js";
 
 const STATUSES = ["planned", "implemented", "stale", "deprecated"] as const;
 const EDGE_KINDS = [
@@ -33,7 +26,6 @@ const EDGE_KINDS = [
   "dependency",
   "control",
 ] as const;
-const EVENT_KINDS = ["compute", "io", "wait", "error"] as const;
 
 const codeRefSchema = z.object({
   path: z.string(),
@@ -53,13 +45,6 @@ function uniqueEdgeId(d: LoomDiagram): string {
   let i = d.edges.length + 1;
   while (ids.has(`e${i}`)) i++;
   return `e${i}`;
-}
-
-function uniqueEventId(tl: LoomTimeline): string {
-  const ids = new Set(tl.events.map((e) => e.id));
-  let i = tl.events.length + 1;
-  while (ids.has(`ev${i}`)) i++;
-  return `ev${i}`;
 }
 
 function jsonText(obj: unknown) {
@@ -92,31 +77,10 @@ async function persist(loomPath: string, id: string, d: LoomDiagram) {
   return null;
 }
 
-async function readTimelineOrError(loomPath: string, id: string) {
-  try {
-    return { ok: true as const, timeline: await readTimeline(loomPath, id) };
-  } catch (e) {
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
-      return { ok: false as const, error: errorText(`timeline '${id}' not found`) };
-    }
-    return { ok: false as const, error: errorText(`read failed: ${(e as Error).message}`) };
-  }
-}
-
-async function persistTimeline(loomPath: string, id: string, tl: LoomTimeline) {
-  const result = await validateTimeline(tl);
-  if (!result.ok) {
-    return errorText("Validation failed:", result.errors);
-  }
-  await writeTimeline(loomPath, id, tl);
-  return null;
-}
-
 export function createMcpServer(loomRoot: LoomRoot) {
   const server = new McpServer(
     { name: "loom-spec", version: "0.0.1" },
-    { instructions: `Use these tools to maintain the architecture spec in ${loomRoot.loomPath}. Diagram tools (loom_*_node, loom_*_edge) edit .loom/diagrams/*.flow.json; timeline tools (loom_*_event) edit .loom/timelines/*.timeline.json. Prefer them over editing the JSON files directly — they validate against the schema before writing.` }
+    { instructions: `Use these tools to maintain the architecture spec in ${loomRoot.loomPath}. They edit .loom/diagrams/*.flow.json — prefer them over editing the JSON files directly because they validate against the schema before writing.` }
   );
 
   server.registerTool(
@@ -357,231 +321,6 @@ export function createMcpServer(loomRoot: LoomRoot) {
       d.edges = d.edges.filter((e) => e.id !== id);
       if (d.edges.length === before) return errorText(`edge '${id}' not found`);
       const err = await persist(loomRoot.loomPath, diagram, d);
-      if (err) return err;
-      return jsonText({ ok: true });
-    }
-  );
-
-  // ─── Timelines ───────────────────────────────────────────────────────
-
-  server.registerTool(
-    "loom_list_timelines",
-    {
-      title: "List timelines",
-      description:
-        "List all timelines in the spec with title, referenced diagram, event count, and total duration in ms.",
-      inputSchema: {},
-    },
-    async () => {
-      const summaries = await listTimelines(loomRoot.loomPath);
-      return jsonText(summaries);
-    }
-  );
-
-  server.registerTool(
-    "loom_read_timeline",
-    {
-      title: "Read timeline",
-      description: "Read a specific timeline's full JSON by id.",
-      inputSchema: { id: z.string().describe("Timeline id (e.g. 'todo-completion')") },
-    },
-    async ({ id }) => {
-      const r = await readTimelineOrError(loomRoot.loomPath, id);
-      if (!r.ok) return r.error;
-      return jsonText(r.timeline);
-    }
-  );
-
-  server.registerTool(
-    "loom_add_event",
-    {
-      title: "Add timeline event",
-      description:
-        "Append a new event (clip) to a timeline. The referenced node must exist in the timeline's diagram. Returns the auto-generated event id.",
-      inputSchema: {
-        timeline: z.string().describe("Timeline id"),
-        node: z
-          .string()
-          .describe(
-            "Node id from the timeline's diagram. The event lights up this node when the playhead enters its interval."
-          ),
-        start_ms: z.number().min(0).describe("Start time in ms from t=0"),
-        duration_ms: z
-          .number()
-          .min(0)
-          .describe("Duration in ms (may be 0 for instantaneous events)"),
-        track: z
-          .string()
-          .optional()
-          .describe(
-            "Track to render this event on. Omit to auto-assign one track per node."
-          ),
-        label: z.string().max(60).optional().describe("Short text shown inside the clip"),
-        description: z.string().optional(),
-        kind: z.enum(EVENT_KINDS).optional().describe("compute | io | wait | error"),
-        code_refs: z.array(codeRefSchema).optional(),
-        triggered_by: z
-          .string()
-          .optional()
-          .describe("Id of another event in this timeline that caused this one"),
-        tags: z.array(z.string()).optional(),
-        id: z
-          .string()
-          .optional()
-          .describe("Optional explicit id (lowercase kebab). Defaults to ev<n>."),
-      },
-    },
-    async ({
-      timeline,
-      node,
-      start_ms,
-      duration_ms,
-      track,
-      label,
-      description,
-      kind,
-      code_refs,
-      triggered_by,
-      tags,
-      id,
-    }) => {
-      const tlRes = await readTimelineOrError(loomRoot.loomPath, timeline);
-      if (!tlRes.ok) return tlRes.error;
-      const tl = tlRes.timeline;
-
-      // Verify the referenced node exists in the underlying diagram.
-      const dRes = await readDiagramOrError(loomRoot.loomPath, tl.diagram);
-      if (!dRes.ok) {
-        return errorText(
-          `timeline '${timeline}' references diagram '${tl.diagram}', which could not be read`
-        );
-      }
-      if (!dRes.diagram.nodes.some((n) => n.id === node)) {
-        return errorText(
-          `node '${node}' does not exist in diagram '${tl.diagram}'. Available: ${dRes.diagram.nodes
-            .map((n) => n.id)
-            .join(", ")}`
-        );
-      }
-
-      // Verify triggered_by, if set, references an existing event.
-      if (triggered_by && !tl.events.some((e) => e.id === triggered_by)) {
-        return errorText(`triggered_by event '${triggered_by}' not found in timeline`);
-      }
-
-      const newId = id ?? uniqueEventId(tl);
-      if (tl.events.some((e) => e.id === newId)) {
-        return errorText(`event with id '${newId}' already exists`);
-      }
-      const event: TimelineEvent = {
-        id: newId,
-        node,
-        start_ms,
-        duration_ms,
-        track,
-        label,
-        description,
-        kind,
-        code_refs,
-        triggered_by,
-        tags,
-      };
-      tl.events.push(event);
-      const err = await persistTimeline(loomRoot.loomPath, timeline, tl);
-      if (err) return err;
-      return jsonText({ ok: true, id: newId });
-    }
-  );
-
-  server.registerTool(
-    "loom_update_event",
-    {
-      title: "Update timeline event",
-      description:
-        "Patch fields on an existing event. Only the fields you pass are changed. If you change 'node', the new node must exist in the timeline's diagram.",
-      inputSchema: {
-        timeline: z.string(),
-        id: z.string().describe("Event id"),
-        patch: z
-          .object({
-            node: z.string().optional(),
-            start_ms: z.number().min(0).optional(),
-            duration_ms: z.number().min(0).optional(),
-            track: z.string().nullable().optional(),
-            label: z.string().max(60).nullable().optional(),
-            description: z.string().nullable().optional(),
-            kind: z.enum(EVENT_KINDS).nullable().optional(),
-            code_refs: z.array(codeRefSchema).optional(),
-            triggered_by: z.string().nullable().optional(),
-            tags: z.array(z.string()).optional(),
-          })
-          .describe("Fields to merge. Pass null to clear an optional field."),
-      },
-    },
-    async ({ timeline, id, patch }) => {
-      const tlRes = await readTimelineOrError(loomRoot.loomPath, timeline);
-      if (!tlRes.ok) return tlRes.error;
-      const tl = tlRes.timeline;
-      const idx = tl.events.findIndex((e) => e.id === id);
-      if (idx < 0) return errorText(`event '${id}' not found in timeline '${timeline}'`);
-
-      // If node is being changed, verify the new node exists in the diagram.
-      if (patch.node !== undefined && patch.node !== tl.events[idx]!.node) {
-        const dRes = await readDiagramOrError(loomRoot.loomPath, tl.diagram);
-        if (!dRes.ok) return dRes.error;
-        if (!dRes.diagram.nodes.some((n) => n.id === patch.node)) {
-          return errorText(
-            `node '${patch.node}' does not exist in diagram '${tl.diagram}'`
-          );
-        }
-      }
-      // If triggered_by is being set (non-null), verify the target exists.
-      if (patch.triggered_by && !tl.events.some((e) => e.id === patch.triggered_by)) {
-        return errorText(`triggered_by event '${patch.triggered_by}' not found`);
-      }
-
-      const merged = { ...tl.events[idx]! } as unknown as Record<string, unknown>;
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined) continue;
-        if (v === null) {
-          // Clear the optional field.
-          delete merged[k];
-        } else {
-          merged[k] = v;
-        }
-      }
-      tl.events[idx] = merged as unknown as TimelineEvent;
-      const err = await persistTimeline(loomRoot.loomPath, timeline, tl);
-      if (err) return err;
-      return jsonText({ ok: true });
-    }
-  );
-
-  server.registerTool(
-    "loom_delete_event",
-    {
-      title: "Delete timeline event",
-      description:
-        "Remove an event by id. Also drops any triggered_by references pointing at it so the timeline stays internally consistent.",
-      inputSchema: {
-        timeline: z.string(),
-        id: z.string(),
-      },
-    },
-    async ({ timeline, id }) => {
-      const tlRes = await readTimelineOrError(loomRoot.loomPath, timeline);
-      if (!tlRes.ok) return tlRes.error;
-      const tl = tlRes.timeline;
-      const before = tl.events.length;
-      tl.events = tl.events.filter((e) => e.id !== id);
-      if (tl.events.length === before) {
-        return errorText(`event '${id}' not found in timeline '${timeline}'`);
-      }
-      // Scrub dangling triggered_by refs.
-      tl.events = tl.events.map((e) =>
-        e.triggered_by === id ? { ...e, triggered_by: undefined } : e
-      );
-      const err = await persistTimeline(loomRoot.loomPath, timeline, tl);
       if (err) return err;
       return jsonText({ ok: true });
     }

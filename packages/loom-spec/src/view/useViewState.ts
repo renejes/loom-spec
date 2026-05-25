@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type ViewKind = "diagram" | "timeline";
+export type ViewKind = "diagram";
 
 export interface ViewState {
   kind: ViewKind;
@@ -14,10 +14,6 @@ function readHash(): ViewState {
   if (typeof location === "undefined") return DEFAULT_VIEW;
   const raw = location.hash.replace(/^#/, "").trim();
   if (!raw) return DEFAULT_VIEW;
-  if (raw.startsWith("timeline:")) {
-    const id = raw.slice("timeline:".length).trim();
-    return id ? { kind: "timeline", id } : DEFAULT_VIEW;
-  }
   if (raw.startsWith("diagram:")) {
     const id = raw.slice("diagram:".length).trim();
     return id ? { kind: "diagram", id } : DEFAULT_VIEW;
@@ -27,15 +23,15 @@ function readHash(): ViewState {
 }
 
 function viewToHash(v: ViewState): string {
-  if (v.kind === "diagram" && v.id === DEFAULT_DIAGRAM_ID) return "";
-  if (v.kind === "diagram") return `#diagram:${v.id}`;
-  return `#timeline:${v.id}`;
+  if (v.id === DEFAULT_DIAGRAM_ID) return "";
+  return `#diagram:${v.id}`;
 }
 
 /**
- * The "view" — which file the editor is currently looking at. Combines
- * kind ("diagram" | "timeline") and id, bound to location.hash so back/
- * forward and bookmarks work naturally.
+ * The "view" — which diagram the editor is currently looking at. Bound to
+ * location.hash so back/forward and bookmarks work naturally. The `kind`
+ * field is here for forward-compat when additional view kinds (e.g.
+ * journeys) land.
  */
 export function useViewState(): {
   view: ViewState;
@@ -56,8 +52,7 @@ export function useViewState(): {
     setView(next);
   }, []);
 
-  const isDefault =
-    view.kind === "diagram" && view.id === DEFAULT_DIAGRAM_ID;
+  const isDefault = view.id === DEFAULT_DIAGRAM_ID;
 
   return { view, navigate, isDefault };
 }

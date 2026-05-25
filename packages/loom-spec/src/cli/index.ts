@@ -4,7 +4,6 @@ import { runView } from "./view.js";
 import { runValidate } from "./validate.js";
 import { runMcp } from "./mcp.js";
 import { runInstallMcp } from "./installMcp.js";
-import { runImportTrace } from "./importTrace.js";
 import { runExportHtml, DEFAULT_OUT as EXPORT_DEFAULT_OUT } from "./exportHtml.js";
 
 const HELP = `loom-spec — node-based architecture spec for your repo
@@ -30,35 +29,25 @@ Usage:
       pre-commit hook.
 
   loom-spec mcp [--root <dir>]
-      Start a Model Context Protocol server on stdio. Exposes 15 tools
-      for diagrams (loom_list_diagrams, loom_add_node, loom_add_edge, …)
-      and timelines (loom_list_timelines, loom_add_event, …) — wire it
-      into Claude Code's mcp.json (or any MCP-capable client).
+      Start a Model Context Protocol server on stdio. Exposes 10 tools
+      for editing diagrams (loom_list_diagrams, loom_add_node,
+      loom_add_edge, loom_validate, …). Wire it into Claude Code's
+      mcp.json (or any MCP-capable client).
 
   loom-spec export-html [<bundle-name>] [--out <path>] [--diagram <id>]
-                        [--no-timelines]
                         [--include-tag <comma-list>] [--exclude-tag <comma-list>]
                         [--root <dir>]
       Build a standalone interactive HTML file from the spec — pan/zoom,
-      drill-down, switch diagrams, play timelines. Single self-contained
-      file, no server needed. Drop it into a manual, wiki, GitHub Pages
-      site, anywhere. Output defaults to ./loom.html. With --diagram, only
-      that diagram (and timelines referencing it) ship. With
-      --include-tag / --exclude-tag, only nodes whose 'tags' match
-      survive — edges, groups, drill-down chevrons, timeline events that
-      point at dropped nodes are cleaned up automatically.
+      drill-down, switch diagrams. Single self-contained file, no server
+      needed. Drop it into a manual, wiki, GitHub Pages site, anywhere.
+      Output defaults to ./loom.html. With --diagram, only that diagram
+      ships. With --include-tag / --exclude-tag, only nodes whose 'tags'
+      match survive — edges, groups, and drill-down chevrons that point
+      at dropped nodes are cleaned up automatically.
 
       Pass a <bundle-name> as the first positional arg to read settings
       from a named bundle in .loom/exports.json. Explicit flags override
       the bundle's values.
-
-  loom-spec import-trace <trace.json> --as <timeline-id> --diagram <diagram-id>
-                        [--map <mapping.json>] [--append] [--root <dir>]
-      Read an OpenTelemetry OTLP-JSON trace and generate a timeline that
-      mirrors the actual spans on the named diagram. Each span becomes
-      an event; parent/child relationships preserve as triggered_by;
-      service.name becomes the track. Spans whose service or name can't
-      be matched to a node are skipped — pass --map to override.
 
   loom-spec --help
       Print this help.
@@ -147,35 +136,9 @@ async function main() {
       out: (flags.out as string) ?? EXPORT_DEFAULT_OUT,
       root: (flags.root as string) ?? process.cwd(),
       diagram: typeof flags.diagram === "string" ? flags.diagram : undefined,
-      noTimelines: Boolean(flags["no-timelines"]),
       includeTags: splitTags(flags["include-tag"]),
       excludeTags: splitTags(flags["exclude-tag"]),
       bundle,
-    });
-    return;
-  }
-
-  if (subcommand === "import-trace") {
-    // Positional arg: the trace file path.
-    const trace = positional[0];
-    if (!trace) {
-      console.error("import-trace: missing trace file path");
-      console.log(HELP);
-      process.exit(1);
-    }
-    const asId = flags.as as string | undefined;
-    const diagramId = flags.diagram as string | undefined;
-    if (!asId || !diagramId) {
-      console.error("import-trace: --as <timeline-id> and --diagram <diagram-id> are required");
-      process.exit(1);
-    }
-    await runImportTrace({
-      trace,
-      asId,
-      diagramId,
-      map: typeof flags.map === "string" ? flags.map : undefined,
-      append: Boolean(flags.append),
-      root: (flags.root as string) ?? process.cwd(),
     });
     return;
   }

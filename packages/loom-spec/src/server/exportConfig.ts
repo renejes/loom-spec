@@ -13,7 +13,6 @@
  *         "include-tags": ["public"],
  *         "exclude-tags": ["wip"],
  *         "diagram": "overview",       // optional, single-diagram mode
- *         "no-timelines": true,        // default false
  *         "out": "docs/architecture.html"  // optional, default loom.html
  *       },
  *       "ops-runbook": {
@@ -33,7 +32,6 @@ export interface NamedExport {
   includeTags?: string[];
   excludeTags?: string[];
   diagram?: string;
-  noTimelines?: boolean;
   out?: string;
 }
 
@@ -45,7 +43,6 @@ interface RawNamedExport {
   "include-tags"?: unknown;
   "exclude-tags"?: unknown;
   diagram?: unknown;
-  "no-timelines"?: unknown;
   out?: unknown;
 }
 
@@ -69,14 +66,6 @@ function asString(v: unknown, where: string): string | undefined {
   return v;
 }
 
-function asBool(v: unknown, where: string): boolean | undefined {
-  if (v === undefined) return undefined;
-  if (typeof v !== "boolean") {
-    throw new Error(`exports.json: ${where} must be a boolean`);
-  }
-  return v;
-}
-
 function normalize(raw: RawExportsFile): ExportsFile {
   const out: ExportsFile = { exports: {} };
   const entries = Object.entries(raw.exports ?? {});
@@ -90,7 +79,6 @@ function normalize(raw: RawExportsFile): ExportsFile {
       includeTags: asStringArray(e["include-tags"], `${name}.include-tags`),
       excludeTags: asStringArray(e["exclude-tags"], `${name}.exclude-tags`),
       diagram: asString(e.diagram, `${name}.diagram`),
-      noTimelines: asBool(e["no-timelines"], `${name}.no-timelines`),
       out: asString(e.out, `${name}.out`),
     };
   }

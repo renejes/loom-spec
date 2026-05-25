@@ -7,7 +7,8 @@ export interface ParallelEdgeData extends Record<string, unknown> {
    * 0 = straight centerline, positive/negative = curved outwards.
    */
   parallelOffset?: number;
-  /** Driven by the timeline playhead — true while the source node is currently active. */
+  /** True while this edge should render with a traveling pulse marker
+   *  (e.g. between consecutive Journey steps). */
   pulsing?: boolean;
 }
 

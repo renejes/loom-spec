@@ -1,9 +1,9 @@
 # Implementation Plan
 
-Forward-looking implementation plans only. For what has shipped, see
-[`done/`](./done/). For the open backlog, see [`next-steps.md`](./next-steps.md).
-For the current state of the codebase, see
-[`project-status.md`](./project-status.md).
+Forward-looking implementation plans only. For what has shipped (and
+what was deliberately removed), see [`done/`](./done/). For the open
+backlog, see [`next-steps.md`](./next-steps.md). For the current state
+of the codebase, see [`project-status.md`](./project-status.md).
 
 ## Active
 
@@ -11,72 +11,37 @@ For the current state of the codebase, see
 
 Full plan in [`journeys-plan.md`](./journeys-plan.md). Goal: a separate
 file kind for "user journey" / "workflow" documentation — an ordered
-list of steps, each tied to a node in a diagram. Different from
-timelines (no `start_ms` / `duration_ms`) and from tags (sequence
-matters). Renders as a step-navigator with prev/next + a diagram pane
-that highlights the current and visited nodes. Exportable as a
-standalone HTML via `--from-journey <id>`.
+list of steps, each tied to a node in a diagram. Different from tags
+(sequence matters) and from the now-removed Timeline view (no
+`start_ms` / `duration_ms`). Renders as a step-navigator with prev/next
+plus a diagram pane that highlights the current and visited nodes.
+Exportable as a standalone HTML via `--from-journey <id>`.
+
+The plan reuses `PulseEdge` and `DiagramCanvas`'s `activeNodeIds` /
+`pulsingEdgeIds` props (both originally built for the timeline mini
+graph, kept after the Phase 4 scope-down specifically for this).
 
 ## Backlog (planning sketches)
 
 Each item has a brief sketch — turn into a full plan when picked.
 
-### #23 — Editable timeline inspector
+### #26 — Pure-SVG mini-renderer (drop xyflow from the embedded read-only path)
 
-TimelineInspector is currently read-only; clip details are mutable via
-drag/resize, the `+ Event` button, or hand-editing JSON. Field-level
-editing (`label`, `kind`, `description`, `code_refs`, `tags`,
-`triggered_by`) would remove the last reason to drop into JSON. Mirror
-the existing `Inspector.tsx` patterns from the node case.
-
-**Effort.** ~3–4 h.
-
-### #24 — Planned-vs-observed diff view
-
-With `import-trace` shipped, the natural next step is overlaying an
-imported timeline on top of a hand-authored one for the same diagram —
-same horizontal axis, different visual treatment per source. Makes
-drift between "what we said" and "what actually happens" visible.
-
-**Approach.** TimelineCanvas takes a second optional `LoomTimeline`
-prop. When provided, its events render at ~40% opacity in a separate
-band per track (above the primary clips). Hover shows the time delta
-(`observed: 280ms, planned: 200ms — +40%`).
-
-**Effort.** ~1 day.
-
-### #25 — Sticky track labels at high zoom
-
-At zoom ≥ 2× the `LABEL_COL` scrolls off the left when the user pans
-horizontally. Render the label column as a sticky overlay (or split
-the SVG into a fixed-label `<svg>` plus a scrollable canvas `<svg>`)
-so users keep context while panning.
-
-**Effort.** ~2–3 h.
-
-### #26 — Pure-SVG mini-renderer (drop xyflow from the timeline path)
-
-Code-splitting (#20) only saves ~14 kB today because xyflow stays in
-the main bundle — both the full diagram view and the mini graph use
-it. A hand-rolled SVG mini-renderer (positioned nodes + edges, no
-interaction beyond fitView) would let xyflow leave the timeline
-chunk and the export bundle entirely, dropping payloads by ~150 kB+.
+Currently the standalone HTML export bundles all of xyflow (~150 kB)
+even though it only renders a static, non-interactive read of the
+diagram. A hand-rolled SVG renderer that takes positioned nodes +
+edges + an optional `activeNodeIds` would let xyflow leave the export
+bundle entirely.
 
 **Approach.** New `<MiniDiagram nodes edges activeIds pulsingIds>`
 component. ~150 lines of SVG. Computes a fit transform on mount and
 on container resize. Reuses NodeCard's visual styling but renders
-into the SVG layer. The interactive DiagramCanvas stays xyflow-based.
+into the SVG layer. The interactive `DiagramCanvas` stays xyflow-based.
+
+The Journey view (planned) is the main beneficiary: its read-only
+diagram pane doesn't need xyflow's interaction layer at all.
 
 **Effort.** ~1 day.
-
-### #27 — OTLP-protobuf + Jaeger / Zipkin trace formats
-
-`import-trace` currently handles OTLP JSON only. Add adapters in
-`src/server/otel.ts` that detect the format from the file shape and
-project all of them down to the same `ParsedSpan[]` array. Per-format
-work, can ship one at a time.
-
-**Effort.** ~half day per format.
 
 ### #16 — Custom-type fields beyond primitives
 
@@ -103,13 +68,17 @@ read-only mode for the live editor.
 
 ## Notes on sequencing
 
-- Items 1–14 of the original plan, plus 15a–15g and the export work
-  in Phase 3, are all archived in [`done/`](./done/).
+- Items 1–14 (Phase 1 foundation) and the v0.4.0 export work (Phase 3)
+  are archived in [`done/`](./done/).
+- The Phase 2 timeline work and Phase 4 removal are also in
+  [`done/`](./done/) as honest history.
 - The next concrete planned chunk is **Journeys**
   ([`journeys-plan.md`](./journeys-plan.md)) — a new file kind for
-  ordered, untimed workflows distinct from both timelines and tags.
+  ordered, untimed workflows.
 - After that, **#26 Pure-SVG mini-renderer** is the highest-leverage
   remaining item — it shrinks the export bundle dramatically and
-  removes xyflow as a hard dependency of the read-only path.
+  removes xyflow as a hard dependency of the read-only path. Most
+  valuable in combination with the Journey view, which is read-only
+  by nature.
 - Everything else is demand-driven polish. Pick by what real-world
   use surfaces as the next pain.

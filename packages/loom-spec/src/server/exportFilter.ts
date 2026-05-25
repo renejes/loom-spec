@@ -19,9 +19,6 @@
  *         drop the group; otherwise keep with surviving children.
  *      4. Null out `drill_down` chevrons that target diagrams with zero
  *         surviving nodes after filtering.
- *      5. Drop timeline events whose referenced node was dropped.
- *      6. Drop timelines that end up with zero events.
- *      7. Null out `triggered_by` refs pointing at dropped events.
  *
  *  - Diagrams that end up empty are NOT dropped automatically — the caller
  *    decides (often via --diagram for explicit single-diagram exports).
@@ -30,7 +27,6 @@
  */
 
 import type { LoomDiagram, Node as LoomNode } from "../types/diagram.js";
-import type { LoomTimeline, TimelineEvent } from "../types/timeline.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
 
 export interface FilterSpec {
@@ -40,7 +36,6 @@ export interface FilterSpec {
 
 export interface LoomExportPayload {
   diagrams: Record<string, LoomDiagram>;
-  timelines: Record<string, LoomTimeline>;
   nodeTypes: LoomNodeTypes;
 }
 
@@ -51,8 +46,6 @@ export interface FilterResult {
     nodesDropped: number;
     edgesDropped: number;
     groupsDropped: number;
-    eventsDropped: number;
-    timelinesDropped: number;
     drillDownsCleared: number;
   };
 }
@@ -88,8 +81,6 @@ export function applyFilter(
         nodesDropped: 0,
         edgesDropped: 0,
         groupsDropped: 0,
-        eventsDropped: 0,
-        timelinesDropped: 0,
         drillDownsCleared: 0,
       },
     };
@@ -98,13 +89,11 @@ export function applyFilter(
   let nodesDropped = 0;
   let edgesDropped = 0;
   let groupsDropped = 0;
-  let eventsDropped = 0;
-  let timelinesDropped = 0;
   let drillDownsCleared = 0;
 
   // First pass: filter each diagram's nodes / edges / groups.
-  // Track surviving node ids per diagram so we can decide which timelines
-  // and drill_down references stay valid.
+  // Track surviving node ids per diagram so we can decide which drill_down
+  // references stay valid.
   const filteredDiagrams: Record<string, LoomDiagram> = {};
   const survivingNodeIdsByDiagram: Record<string, Set<string>> = {};
 
@@ -169,45 +158,15 @@ export function applyFilter(
     }
   }
 
-  // Third pass: filter timelines. Drop events on filtered nodes; drop the
-  // whole timeline if it ends up empty; scrub dangling triggered_by refs.
-  const filteredTimelines: Record<string, LoomTimeline> = {};
-  for (const [id, tl] of Object.entries(payload.timelines)) {
-    const survivingIds = survivingNodeIdsByDiagram[tl.diagram];
-    if (!survivingIds || survivingIds.size === 0) {
-      // Underlying diagram fully filtered → drop timeline.
-      timelinesDropped++;
-      eventsDropped += tl.events.length;
-      continue;
-    }
-    const beforeEvents = tl.events.length;
-    const survivingEvents = tl.events.filter((e) => survivingIds.has(e.node));
-    eventsDropped += beforeEvents - survivingEvents.length;
-    if (survivingEvents.length === 0) {
-      timelinesDropped++;
-      continue;
-    }
-    const survivingEventIds = new Set(survivingEvents.map((e) => e.id));
-    const scrubbed: TimelineEvent[] = survivingEvents.map((e) =>
-      e.triggered_by && !survivingEventIds.has(e.triggered_by)
-        ? { ...e, triggered_by: undefined }
-        : e
-    );
-    filteredTimelines[id] = { ...tl, events: scrubbed };
-  }
-
   return {
     payload: {
       diagrams: filteredDiagrams,
-      timelines: filteredTimelines,
       nodeTypes: payload.nodeTypes,
     },
     summary: {
       nodesDropped,
       edgesDropped,
       groupsDropped,
-      eventsDropped,
-      timelinesDropped,
       drillDownsCleared,
     },
   };

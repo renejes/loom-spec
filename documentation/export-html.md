@@ -5,14 +5,13 @@ anyone can drop into a manual, wiki, docs site, GitHub Pages, Notion embed,
 or just attach to an email. The viewer is the same React + xyflow UI as
 `loom-spec view`, minus everything that requires a server: no editing,
 no live sync, no add buttons. The reader can still pan/zoom, drill down
-between diagrams, switch to timelines, play them back, and inspect
-individual nodes.
+between diagrams, and inspect individual nodes.
 
 ## Usage
 
 ```sh
 loom-spec export-html [<bundle-name>]
-                      [--out <path>] [--diagram <id>] [--no-timelines]
+                      [--out <path>] [--diagram <id>]
                       [--include-tag <comma-list>] [--exclude-tag <comma-list>]
                       [--root <dir>]
 ```
@@ -20,10 +19,7 @@ loom-spec export-html [<bundle-name>]
 - `<bundle-name>` — optional first positional arg. Resolves settings from
   a named export in `.loom/exports.json` (see [Named bundles](#named-bundles)).
 - `--out` — output file path. Default: `loom.html` in cwd.
-- `--diagram` — only this diagram, plus any timelines that reference it.
-  Omit for a full export.
-- `--no-timelines` — skip all timelines. Useful for manuals that only
-  need the static architecture diagrams.
+- `--diagram` — only this diagram. Omit for a full export.
 - `--include-tag` — comma-separated list. Only nodes whose `tags` field
   includes at least one of these survive. Default: keep all nodes.
 - `--exclude-tag` — comma-separated list. Drop any node whose `tags`
@@ -34,8 +30,8 @@ CLI flags override values set in a named bundle.
 
 ## Output
 
-A single self-contained HTML file (~560 kB for the todo-app demo with
-2 diagrams + 1 timeline). Contains, inlined:
+A single self-contained HTML file (~530 kB for the todo-app demo with
+2 diagrams). Contains, inlined:
 
 - The Vite-built React + xyflow viewer bundle (JS + CSS).
 - All `.loom/` data as a `<script>window.__LOOM_DATA__ = {...}</script>`
@@ -52,15 +48,12 @@ Interactive in the export:
 - Pan + zoom on the diagram canvas (xyflow Controls)
 - Click a node → inspector shows fields (read-only)
 - Drill-down navigation (chevron button on nodes / groups)
-- Diagram switcher dropdown to flip between diagrams + timelines
-- Timeline playback: Play/Pause (Space), Reset (Home), speed selector,
-  scrubbable axis, zoom selector
-- Mini-graph glow + edge pulse driven by the playhead
+- Diagram switcher dropdown to flip between diagrams
 - Light/dark theme toggle
 
 Disabled in the export:
-- "+ Add" node / event buttons
-- Drag to move, resize clips, delete with Delete key
+- "+ Add" node button
+- Drag to move, delete with Delete key
 - Inspector inputs are present but no-op on change
 - "+ New diagram…" entry in the switcher
 - Server-sent live updates (there's no server)
@@ -105,16 +98,16 @@ Place the `.html` in the static-assets dir and link from your docs.
 ## Size + performance
 
 - Bundle: ~530 kB raw, ~165 kB gzipped.
-- Data inlined: ~30 kB raw for the todo-app demo; scales linearly with
-  the number of nodes + timeline events.
+- Data inlined: ~10 kB raw for the todo-app demo; scales linearly with
+  the number of nodes.
 - Time to interactive: <100 ms on a modern laptop (everything is inline
   — no network).
 
-The single-chunk export build is intentional. The regular `loom-spec view`
-build code-splits TimelineView for the live editor, but a standalone
-HTML can't load a separate chunk on demand (there's no server to fetch
-from), so for the export we force everything into one chunk. This adds
-~18 kB versus the split build but eliminates the runtime fetch.
+The single-chunk export build is intentional. A standalone HTML can't
+load a separate chunk on demand (there's no server to fetch from), so
+for the export we force everything into one chunk. Backlog #26
+(pure-SVG mini-renderer) would let xyflow leave the export bundle
+entirely, cutting another ~150 kB.
 
 ## Updating an exported file
 
@@ -170,10 +163,6 @@ automatically — no dangling references in the export:
 3. **Drill-down chevrons**: if a node's `drill_down` points at a diagram
    with zero surviving nodes after filtering, clear the chevron (the
    diagram still ships, but the link goes away). Same for group drill-downs.
-4. **Timeline events**: drop events whose referenced node was dropped.
-5. **Timelines**: if a timeline ends up with zero events, drop the
-   timeline entirely.
-6. **`triggered_by`**: scrub references pointing at dropped events.
 
 The CLI prints a summary line after exporting (`Filter dropped: 3 nodes,
 4 edges, 1 group.`) so you can sanity-check what you're shipping.
@@ -210,7 +199,6 @@ produces the same output without remembering CLI flags.
       "include-tags": ["public"],
       "exclude-tags": ["wip"],
       "diagram": "overview",
-      "no-timelines": true,
       "out": "docs/architecture.html"
     },
     "ops-runbook": {
@@ -236,13 +224,15 @@ CLI flags override the bundle's values. Useful for previews
 
 A smoke test at `packages/loom-spec/scripts/smoke-export-html.ts`:
 
-- Runs the CLI three times against the todo-app fixture: full, with
-  `--no-timelines`, and with `--diagram celebration-detail`.
+- Runs the CLI multiple times against the todo-app fixture: full,
+  `--diagram celebration-detail`, `--include-tag public`,
+  `--exclude-tag critical-path`, and a named bundle.
 - Asserts the output is a non-trivial HTML file with the expected
   `<style>`, inlined `<script type="module">`, and `__LOOM_DATA__` shape.
-- Verifies `--no-timelines` empties the timeline map.
-- Verifies `--diagram` correctly filters out timelines that target
-  other diagrams.
+- Verifies `--include-tag` cascade drops orphaned edges + groups.
+- Verifies `--include-tag` matching 0 nodes exits non-zero.
+- Verifies named bundle resolution from `.loom/exports.json` works
+  (and that an unknown bundle name exits non-zero).
 
 Run it directly:
 

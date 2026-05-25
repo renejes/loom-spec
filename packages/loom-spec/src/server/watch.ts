@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { basename, resolve } from "node:path";
 
 export interface LoomChangeEvent {
-  type: "diagram-changed" | "node-types-changed" | "timeline-changed";
+  type: "diagram-changed" | "node-types-changed";
   id?: string;
 }
 
@@ -31,7 +31,6 @@ export class LoomWatcher extends EventEmitter {
       this.watcher = chokidarWatch(
         [
           resolve(this.loomPath, "diagrams"),
-          resolve(this.loomPath, "timelines"),
           resolve(this.loomPath, "node-types.json"),
         ],
         {
@@ -44,9 +43,6 @@ export class LoomWatcher extends EventEmitter {
         if (this.isSelfWrite(path)) return;
         if (path.endsWith("/node-types.json")) {
           this.emit("change", { type: "node-types-changed" });
-        } else if (path.endsWith(".timeline.json")) {
-          const id = basename(path, ".timeline.json");
-          this.emit("change", { type: "timeline-changed", id });
         } else if (path.endsWith(".flow.json")) {
           const id = basename(path, ".flow.json");
           this.emit("change", { type: "diagram-changed", id });

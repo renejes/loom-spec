@@ -1,6 +1,5 @@
 import type { LoomDiagram } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
-import type { LoomTimeline } from "../types/timeline";
 import { getExportData, isExportMode } from "./exportMode";
 
 export interface LoadedSpec {
@@ -38,21 +37,6 @@ function summarizeDiagram(id: string, d: LoomDiagram): DiagramSummary {
     description: d.description,
     nodeCount: d.nodes?.length ?? 0,
     edgeCount: d.edges?.length ?? 0,
-  };
-}
-
-function summarizeTimeline(id: string, tl: LoomTimeline): TimelineSummary {
-  const totalDurationMs = (tl.events ?? []).reduce(
-    (m, e) => Math.max(m, (e.start_ms ?? 0) + (e.duration_ms ?? 0)),
-    0
-  );
-  return {
-    id,
-    title: tl.title,
-    description: tl.description,
-    diagram: tl.diagram,
-    eventCount: tl.events?.length ?? 0,
-    totalDurationMs,
   };
 }
 
@@ -106,52 +90,4 @@ export async function createEmptyDiagram(id: string, title: string): Promise<voi
     edges: [],
   };
   await saveDiagram(diagram);
-}
-
-// ─── Timelines ────────────────────────────────────────────────────
-
-export interface TimelineSummary {
-  id: string;
-  title: string;
-  description?: string;
-  diagram: string;
-  eventCount: number;
-  totalDurationMs: number;
-}
-
-export async function listTimelines(): Promise<TimelineSummary[]> {
-  const d = getExportData();
-  if (d) {
-    return Object.entries(d.timelines)
-      .map(([id, tl]) => summarizeTimeline(id, tl))
-      .sort((a, b) => a.id.localeCompare(b.id));
-  }
-  return fetchJson<TimelineSummary[]>("/api/timelines");
-}
-
-export async function loadTimeline(id: string): Promise<LoomTimeline> {
-  const d = getExportData();
-  if (d) {
-    const tl = d.timelines[id];
-    if (!tl) throw new Error(`Timeline '${id}' not in this export.`);
-    return tl;
-  }
-  return fetchJson<LoomTimeline>(`/api/timelines/${id}`);
-}
-
-export async function saveTimeline(timeline: LoomTimeline): Promise<void> {
-  if (isExportMode()) {
-    throw new Error("Edits are disabled in exported HTML.");
-  }
-  const res = await fetch(`/api/timelines/${timeline.id}`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(timeline),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(
-      `save failed: ${res.status} ${(body as { error?: string }).error ?? ""}`
-    );
-  }
 }

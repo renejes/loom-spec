@@ -6,7 +6,7 @@ import { AddNodeMenu } from "./AddNodeMenu";
 import { useDiagramState, uniqueNodeId } from "../state";
 import { createEmptyDiagram } from "../loadDiagram";
 import { isExportMode } from "../exportMode";
-import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
+import type { DiagramSummary } from "../loadDiagram";
 import type { Node as LoomNode } from "../../types/diagram";
 import type { ViewState } from "../useViewState";
 
@@ -18,7 +18,6 @@ export type Selection =
 interface Props {
   id: string;
   diagrams: DiagramSummary[];
-  timelines: TimelineSummary[];
   refreshDiagrams: () => void;
   isDefault: boolean;
   onClickHome: () => void;
@@ -28,7 +27,6 @@ interface Props {
 export function DiagramView({
   id,
   diagrams,
-  timelines,
   refreshDiagrams,
   isDefault,
   onClickHome,
@@ -141,12 +139,10 @@ export function DiagramView({
   return (
     <div className="app">
       <TopBar
-        viewKind="diagram"
         viewId={id}
         title={state.diagram.title}
         subtitle={state.diagram.description}
         diagrams={diagrams}
-        timelines={timelines}
         saveStatus={state.saveStatus}
         saveError={state.saveError}
         connectionStatus={state.connectionStatus}

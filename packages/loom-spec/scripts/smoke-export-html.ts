@@ -1,7 +1,7 @@
 /**
- * Smoke-test for `loom-spec export-html` (#28). Runs the CLI against the
- * todo-app fixture, asserts the output HTML structure (inlined CSS, inlined
- * JS bundle, embedded data shape), then cleans up the tmp file.
+ * Smoke-test for `loom-spec export-html`. Runs the CLI against the
+ * todo-app fixture, asserts the output HTML structure (inlined CSS,
+ * inlined JS bundle, embedded data shape), then cleans up the tmp file.
  *
  * Run: pnpm --filter loom-spec exec tsx scripts/smoke-export-html.ts
  */
@@ -72,9 +72,7 @@ async function main() {
     // Only check <head> for residual external refs. We can't reliably grep
     // for "no external script src=" because the inlined bundle contains
     // string literals like "/assets/bundle.js" inside Vite's preload
-    // helpers (harmless — nothing fetches them). The presence of the
-    // single inlined <script type="module"> tag (asserted above) is the
-    // real signal that bundling worked.
+    // helpers (harmless — nothing fetches them).
     const headMatch = html.match(/<head[\s\S]*?<\/head>/i);
     const head = headMatch?.[0] ?? "";
     expect("No leftover stylesheet link in <head>",
@@ -82,7 +80,6 @@ async function main() {
 
     const data = extractLoomData(html) as {
       diagrams?: Record<string, { id: string; nodes: unknown[] }>;
-      timelines?: Record<string, { id: string; events: unknown[] }>;
       nodeTypes?: { types?: Record<string, unknown> };
       generatedAt?: string;
     } | null;
@@ -91,30 +88,11 @@ async function main() {
       Object.keys(data?.diagrams ?? {}).length === 2);
     expect("Contains overview diagram with > 0 nodes",
       (data?.diagrams?.["overview"]?.nodes.length ?? 0) > 0);
-    expect("Contains 1 timeline (todo-completion)",
-      Object.keys(data?.timelines ?? {}).length === 1);
-    expect("Timeline has events",
-      (data?.timelines?.["todo-completion"]?.events.length ?? 0) > 0);
     expect("nodeTypes inlined", !!data?.nodeTypes?.types);
     expect("generatedAt is an ISO timestamp",
       typeof data?.generatedAt === "string" &&
         /\d{4}-\d{2}-\d{2}T/.test(data!.generatedAt));
 
-    await unlink(outPath);
-
-    // ─── --no-timelines flag ────────────────────────────────────────
-    execFileSync(
-      "pnpm",
-      ["--filter", "loom-spec", "exec", "tsx", cliEntry,
-       "export-html", "--root", fixture, "--out", outPath, "--no-timelines"],
-      { cwd: repoRoot, encoding: "utf8" }
-    );
-    const html2 = await readFile(outPath, "utf8");
-    const data2 = extractLoomData(html2) as {
-      timelines?: Record<string, unknown>;
-    } | null;
-    expect("--no-timelines drops all timelines",
-      Object.keys(data2?.timelines ?? {}).length === 0);
     await unlink(outPath);
 
     // ─── --diagram <id> flag ────────────────────────────────────────
@@ -128,15 +106,10 @@ async function main() {
     const html3 = await readFile(outPath, "utf8");
     const data3 = extractLoomData(html3) as {
       diagrams?: Record<string, unknown>;
-      timelines?: Record<string, unknown>;
     } | null;
     expect("--diagram filters to a single diagram",
       Object.keys(data3?.diagrams ?? {}).length === 1 &&
         "celebration-detail" in (data3?.diagrams ?? {}));
-    expect(
-      "--diagram skips timelines that target other diagrams",
-      Object.keys(data3?.timelines ?? {}).length === 0
-    );
     await unlink(outPath);
 
     // ─── --include-tag public (only todo-list-view has it) ──────────
@@ -152,7 +125,6 @@ async function main() {
     const html4 = await readFile(outPath, "utf8");
     const data4 = extractLoomData(html4) as {
       diagrams?: Record<string, { nodes: { id: string }[]; edges: unknown[]; groups?: unknown[] }>;
-      timelines?: Record<string, { events: { node: string }[] }>;
     } | null;
     const overview4 = data4?.diagrams?.["overview"];
     expect("--include-tag=public retains only todo-list-view in overview",
@@ -161,11 +133,6 @@ async function main() {
       (overview4?.edges.length ?? -1) === 0);
     expect("--include-tag drops empty groups",
       (overview4?.groups?.length ?? 0) === 0);
-    // todo-completion has 2 events on todo-list-view; the other 4 reference
-    // dropped nodes. Timeline survives with the 2 surviving events.
-    const tl4 = data4?.timelines?.["todo-completion"];
-    expect("--include-tag keeps timeline with surviving events",
-      !!tl4 && tl4.events.every((e) => e.node === "todo-list-view"));
     await unlink(outPath);
 
     // ─── --include-tag bogus → refuses to write ─────────────────────
@@ -215,7 +182,6 @@ async function main() {
             exports: {
               "user-manual": {
                 "include-tags": ["public"],
-                "no-timelines": true,
               },
             },
           },
@@ -234,14 +200,11 @@ async function main() {
       const html6 = await readFile(outPath, "utf8");
       const data6 = extractLoomData(html6) as {
         diagrams?: Record<string, { nodes: { id: string }[] }>;
-        timelines?: Record<string, unknown>;
       } | null;
       const overview6 = data6?.diagrams?.["overview"];
       expect("named bundle applies include-tags filter",
         overview6?.nodes.length === 1 &&
           overview6.nodes[0]?.id === "todo-list-view");
-      expect("named bundle applies no-timelines",
-        Object.keys(data6?.timelines ?? {}).length === 0);
       await unlink(outPath);
 
       // Bundle not found

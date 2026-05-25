@@ -5,14 +5,11 @@ import { findLoomRoot } from "../server/findLoomRoot.js";
 import {
   listDiagrams,
   readDiagram,
-  listTimelines,
-  readTimeline,
   readNodeTypes,
 } from "../server/fileOps.js";
 import { applyFilter, type FilterSpec } from "../server/exportFilter.js";
 import { loadExportsConfig } from "../server/exportConfig.js";
 import type { LoomDiagram } from "../types/diagram.js";
-import type { LoomTimeline } from "../types/timeline.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
 
 export interface ExportHtmlArgs {
@@ -20,11 +17,8 @@ export interface ExportHtmlArgs {
   out: string;
   /** Working directory root (walked up to find .loom/). */
   root: string;
-  /** If set, only this diagram (plus any timelines that reference it). */
+  /** If set, only this diagram. */
   diagram?: string;
-  /** Skip all timelines. Useful for manuals where the static topology is
-   *  the whole story. */
-  noTimelines: boolean;
   /** Only export nodes carrying at least one of these tags. */
   includeTags?: string[];
   /** Drop nodes carrying any of these tags. */
@@ -37,7 +31,6 @@ export interface ExportHtmlArgs {
 interface ExportData {
   generatedAt: string;
   diagrams: Record<string, LoomDiagram>;
-  timelines: Record<string, LoomTimeline>;
   nodeTypes: LoomNodeTypes;
 }
 
@@ -93,20 +86,9 @@ async function loadAllData(args: ExportHtmlArgs): Promise<ExportData> {
     }
   }
 
-  // Timelines — include those that reference at least one diagram we exported
-  const timelines: Record<string, LoomTimeline> = {};
-  if (!args.noTimelines) {
-    const summaries = await listTimelines(loomRoot.loomPath);
-    for (const s of summaries) {
-      if (!(s.diagram in diagrams)) continue;
-      timelines[s.id] = await readTimeline(loomRoot.loomPath, s.id);
-    }
-  }
-
   return {
     generatedAt: new Date().toISOString(),
     diagrams,
-    timelines,
     nodeTypes,
   };
 }
@@ -199,7 +181,6 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
       ...args,
       out: args.out !== DEFAULT_OUT ? args.out : bundle.out ?? args.out,
       diagram: args.diagram ?? bundle.diagram,
-      noTimelines: args.noTimelines || (bundle.noTimelines ?? false),
       includeTags: args.includeTags ?? bundle.includeTags,
       excludeTags: args.excludeTags ?? bundle.excludeTags,
     };
@@ -247,7 +228,6 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
   const finalData: ExportData = {
     ...data,
     diagrams: filtered.diagrams,
-    timelines: filtered.timelines,
   };
 
   const html = buildHtml(bundleHtml, bundleCss, bundleJs, finalData, {
@@ -259,20 +239,14 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
 
   const sizeKb = Math.round(Buffer.byteLength(html, "utf8") / 1024);
   const diagramCount = Object.keys(finalData.diagrams).length;
-  const timelineCount = Object.keys(finalData.timelines).length;
   console.log(
     `Wrote ${outPath} (${sizeKb} kB): ` +
-      `${diagramCount} diagram${diagramCount === 1 ? "" : "s"}, ` +
-      `${timelineCount} timeline${timelineCount === 1 ? "" : "s"}.`
+      `${diagramCount} diagram${diagramCount === 1 ? "" : "s"}.`
   );
   const droppedParts: string[] = [];
   if (summary.nodesDropped > 0) droppedParts.push(`${summary.nodesDropped} nodes`);
   if (summary.edgesDropped > 0) droppedParts.push(`${summary.edgesDropped} edges`);
   if (summary.groupsDropped > 0) droppedParts.push(`${summary.groupsDropped} groups`);
-  if (summary.eventsDropped > 0)
-    droppedParts.push(`${summary.eventsDropped} events`);
-  if (summary.timelinesDropped > 0)
-    droppedParts.push(`${summary.timelinesDropped} timelines`);
   if (summary.drillDownsCleared > 0)
     droppedParts.push(`${summary.drillDownsCleared} drill-down refs`);
   if (droppedParts.length > 0) {

@@ -99,8 +99,6 @@ If a `loom-spec` MCP server is registered with the host (e.g. via
 - `loom_list_diagrams`, `loom_read_diagram`, `loom_read_node_types`
 - `loom_add_node`, `loom_update_node`, `loom_mark_stale`, `loom_delete_node`
 - `loom_add_edge`, `loom_delete_edge`
-- `loom_list_timelines`, `loom_read_timeline`
-- `loom_add_event`, `loom_update_event`, `loom_delete_event`
 - `loom_validate` (schema + code-ref drift across every diagram)
 
 They validate against the schema before writing, so invalid edits fail fast
@@ -115,10 +113,10 @@ docs sites, GitHub Pages, embed-in-Notion, etc.), use the CLI:
 
 - `loom-spec export-html` (full export)
 - `loom-spec export-html <bundle-name>` (from `.loom/exports.json`)
-- `loom-spec export-html --include-tag public --no-timelines --out manual.html`
+- `loom-spec export-html --include-tag public --out manual.html`
   (ad-hoc filter)
 
-See Example 7 for the full workflow.
+See Example 6 for the full workflow.
 
 ---
 
@@ -294,93 +292,7 @@ loom_add_node({
 })
 ```
 
-### 6. User wants to document a sequence as a timeline
-
-> User: "Document the checkout flow on a timeline so I can see the latency
-> breakdown."
-
-A timeline is a horizontal time-axis overlay on a specific diagram. Each
-event references a node in that diagram and a `[start_ms, duration_ms]`
-interval. The view plays the events back like a DAW edit, lighting up the
-referenced nodes in a mini graph beside the timeline.
-
-```
-# Step 1: Pick the diagram this sequence belongs to.
-loom_list_diagrams()
-loom_read_diagram("overview")
-
-# Step 2: Create the timeline file. There's no MCP tool for creating one
-# from scratch — write the empty shell directly:
-#
-# .loom/timelines/checkout.timeline.json
-{
-  "version": "1",
-  "id": "checkout",
-  "title": "Checkout — happy path",
-  "description": "Click 'pay' → Stripe charge → confirmation render.",
-  "diagram": "overview",
-  "tracks": [
-    { "id": "client", "label": "Browser",   "color": "#dbeafe" },
-    { "id": "server", "label": "API",       "color": "#dcfce7" },
-    { "id": "data",   "label": "Postgres",  "color": "#ede9fe" }
-  ],
-  "events": []
-}
-
-# Step 3: Append events with the MCP tool — it validates that each `node`
-# actually exists in the referenced diagram, so typos fail fast.
-loom_add_event({
-  timeline: "checkout",
-  node: "checkout-page",
-  track: "client",
-  start_ms: 0,
-  duration_ms: 8,
-  kind: "compute",
-  label: "click pay",
-  code_refs: [{ path: "src/views/Checkout.tsx", symbol: "handlePay" }],
-  tags: ["critical-path", "user-input"]
-})
-# → { ok: true, id: "ev1" }
-
-loom_add_event({
-  timeline: "checkout",
-  node: "payments-api",
-  track: "server",
-  start_ms: 12,
-  duration_ms: 320,
-  kind: "io",
-  label: "POST /checkout (Stripe)",
-  triggered_by: "ev1",      # explicit causation arrow
-  tags: ["critical-path", "external-io"]
-})
-# → { ok: true, id: "ev2" }
-
-# Step 4: Adjust if you got something wrong.
-loom_update_event({
-  timeline: "checkout",
-  id: "ev2",
-  patch: { duration_ms: 280 }
-})
-
-# Step 5: Validate.
-loom_validate()
-```
-
-**When to reach for a timeline rather than extra diagram detail:**
-
-- The *order* and *latency* matter (perf review, race conditions, end-to-end
-  flow). The diagram alone shows topology, not sequencing.
-- You want one node referenced multiple times because it does different
-  things at different moments (e.g. an auth-service that validates *then
-  later* re-issues a JWT). Use `code_refs` on each event for function-level
-  granularity inside the same node.
-- The user describes a *trace*, a *user journey*, or a *failure case* that
-  has a clock.
-
-**Don't create a timeline for static structure** — that's what diagrams are
-for. A timeline of "the app boots, then runs forever" adds noise.
-
-### 7. User wants to publish architecture docs to a manual
+### 6. User wants to publish architecture docs to a manual
 
 > User: "We need to ship the checkout flow as an interactive diagram in
 > our public user manual. Don't expose anything internal."
@@ -414,7 +326,6 @@ loom_update_node({ diagram: "overview", id: "payments-service",
     "user-manual": {
       "include-tags": ["public"],
       "exclude-tags": ["wip"],
-      "no-timelines": true,
       "out": "docs/architecture.html"
     }
   }
@@ -429,13 +340,6 @@ $ loom-spec export-html user-manual
 # code_refs paths leaked in the inspector, the flow makes sense as a
 # standalone visualisation.
 ```
-
-**When to use timelines vs not in an export:**
-
-- Static manual / API reference → `--no-timelines` (the topology is the
-  story). Smaller file, less to digest.
-- Onboarding / "how does the checkout actually run" → keep timelines so
-  the reader can hit Play.
 
 **Don't auto-publish** — the export is intentional. A `git add` of the
 generated `.html` belongs in the change that updates the architecture,

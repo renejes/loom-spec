@@ -1,33 +1,56 @@
 # Journeys — implementation plan
 
 A separate file kind for **guided, ordered, untimed walkthroughs** of
-the architecture. Distinct from timelines (no `start_ms` /
-`duration_ms`) and from tags (sequence matters; "step 1 came before
-step 2" can't be expressed in a flat tag set). Renders as a
-step-navigator with prev/next buttons and a diagram pane that
-highlights the current step's node. Exportable as standalone HTML for
-manuals, onboarding docs, or interactive product tours.
+the architecture. Renders as a step-navigator with prev/next buttons
+and a diagram pane that highlights the current step's node.
+Exportable as standalone HTML for manuals, onboarding docs, or
+interactive product tours.
 
-## Why a new file kind (not a timeline variant, not tags)
+This is the planned replacement for the Phase 2 timeline view (which
+was removed in v0.5.0 — see
+[`done/phase-4-timeline-removal.md`](./done/phase-4-timeline-removal.md)
+for the scope-down reasoning). Same "show me the relevant slice of
+the architecture for this workflow" need, with a much lighter mental
+model.
 
-| Concern | Tags | Timelines | Journeys |
-|---|---|---|---|
-| Express **set** of relevant nodes | ✅ | ⚠️ via events | ✅ |
-| Express **order** | ❌ | ✅ | ✅ |
-| Author without thinking about time | ✅ | ⚠️ awkward | ✅ |
-| Render as step-by-step walkthrough | ❌ | ⚠️ via playback | ✅ |
-| Right vocabulary for the use case | "scope" | "perf trace" | "user journey" |
+## Why a new file kind (not just tags)
 
-Tags handle "filter to relevant nodes". Timelines handle "events with
-timing". Journeys handle "guided sequence without timing". They
-compose: a journey can include nodes that are also tagged `public`;
-an export bundle can include both a journey and the diagrams it
-references.
+| Concern | Tags only | Journeys |
+|---|---|---|
+| Express **set** of relevant nodes | ✅ | ✅ |
+| Express **order** | ❌ | ✅ |
+| Render as step-by-step walkthrough | ❌ | ✅ |
+| Right vocabulary for the use case | "scope" | "user journey" |
+
+Tags handle "filter to the relevant nodes for this subsystem".
+Journeys handle "show this ordered slice with one step at a time".
+They compose: a journey can include nodes that are also tagged
+`public`; an export bundle can include both a journey and the
+diagrams it references.
 
 The name **Journey** is chosen because "Flow" is already taken by
 the `.flow.json` diagram extension. "Journey" is also the common
 UX/product term (user journey, customer journey, onboarding journey),
 which lands the right mental model.
+
+## Components we already have ready for this
+
+The Phase 2 timeline scope-down (v0.5.0) deliberately kept the bits
+that apply to Journeys:
+
+- **`PulseEdge.tsx`** — SVG-animated marker traveling along an edge
+  path. Originally for "pulse edges while source node active during
+  timeline playback"; here for "pulse edges between consecutive
+  journey steps".
+- **`DiagramCanvas` non-interactive mode** with `activeNodeIds` +
+  `pulsingEdgeIds` props. Originally for the timeline mini graph;
+  here for the journey current-step + path-so-far highlight.
+- **`exportMode.ts`** runtime detector — same standalone-HTML
+  short-circuit pattern.
+
+So a lot of the visual primitives are already in place. The new code
+is mostly the journey-specific schema, MCP tools, step-navigator UI,
+and routing.
 
 ## Schema
 
@@ -85,9 +108,10 @@ New file: `packages/loom-spec/schema/journey.schema.json`.
 ```
 
 Deliberate non-additions:
-- No `start_ms` / `duration_ms` / `track` / `kind` — that's a timeline.
+- No `start_ms` / `duration_ms` / `track` / `kind` — journeys are
+  untimed by design. If timing matters, that's a different feature.
 - No `triggered_by` — ordering is implicit from array position.
-- No `tags` — taglike scoping happens by being-in-a-journey-or-not.
+- No `tags` on steps — taglike scoping happens by being-in-a-journey-or-not.
 - `code_refs` is included so drift detection works on journey steps
   too. Same shape as everywhere else.
 
@@ -100,8 +124,8 @@ Deliberate non-additions:
 └── deploy-runbook.journey.json
 ```
 
-Mirrors `.loom/diagrams/` and `.loom/timelines/`. Extension
-`.journey.json`. URL hash `#journey:<id>`.
+Mirrors `.loom/diagrams/`. Extension `.journey.json`. URL hash
+`#journey:<id>`.
 
 ## View (browser editor + standalone export)
 
@@ -109,7 +133,7 @@ New file: `packages/loom-spec/src/view/components/JourneyView.tsx`.
 
 ### Layout
 
-3-region grid like TimelineView but different:
+3-region grid:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -147,21 +171,25 @@ Editor-mode vs export-mode (`isExportMode()`):
   - `visitedNodeIds={new Set(stepsBeforeCurrent.map(s => s.node))}` —
     NEW prop, dim-highlight via a separate CSS class
   - `pulsingEdgeIds={edgesBetweenConsecutiveSteps}` — reuse the
-    existing PulseEdge for the path-so-far
+    existing `PulseEdge` for the path-so-far. Originally built for
+    the timeline mini graph; kept after the v0.5.0 scope-down
+    specifically for this.
 - **NodeCard** needs a new CSS variant `node-visited` (e.g. ~60%
-  opacity + subtle border) in addition to the existing `node-active`.
-- **TopBar** already lists timelines; extend the switcher to list
-  journeys too (per `useJourneysList()`, analogous to
-  `useTimelinesList()`).
+  opacity + subtle border) in addition to the existing `node-active`
+  (also kept from the timeline mini-graph code).
+- **DiagramSwitcher** (currently lists diagrams only) gets a Journeys
+  section. New `useJourneysList()` hook analogous to the now-removed
+  `useTimelinesList()`.
 
 ### State
 
-New `src/view/useJourneyState.ts` mirroring `useTimelineState.ts`:
+New `src/view/useJourneyState.ts`:
 - Loads the journey + the referenced diagram.
 - Tracks `currentStepIndex`.
 - Exposes mutators (`addStep`, `updateStep`, `deleteStep`,
   `reorderSteps`) with debounced auto-save + SSE refetch. All
-  short-circuit in export mode (`isExportMode()`).
+  short-circuit in export mode (`isExportMode()`). Same patterns the
+  existing `state.ts` (diagram state) uses.
 
 ## Hono routes + fileOps
 
@@ -199,8 +227,9 @@ Add to `src/mcp/server.ts`:
    ids.
 8. `loom_delete_journey({ id })` — full delete (rare; prefer renaming).
 
-Same validation pattern as the existing timeline tools (schema check
-before write, cross-check referential integrity).
+Same validation pattern as the existing diagram tools (schema check
+before write, cross-check referential integrity — the `node` of
+every step must exist in the diagram).
 
 ## Export integration
 
@@ -211,10 +240,6 @@ Add to `src/cli/exportHtml.ts`:
   per the existing cascade rules in `exportFilter.ts`). The journey
   itself ships in the export and the standalone HTML opens at
   `#journey:<id>` by default.
-- `--from-journey` also auto-applies `--no-timelines` unless the
-  user explicitly wants timelines (since journeys and timelines are
-  different storytelling modes — mixing them in one export is
-  rare and probably wrong).
 
 Cascade rules in `src/server/exportFilter.ts` extend to journeys:
 - If the journey's referenced diagram is filtered out entirely, drop
@@ -246,13 +271,14 @@ Add a new section under Rules:
 
 - Default to a Journey if the user says "user journey", "customer
   journey", "workflow", "step-by-step", "onboarding", "tour", "guided
-  walkthrough".
-- Use a Timeline if the user mentions latency, performance, perf
-  regression, traces, parallel work, or anything with realistic
-  timing.
+  walkthrough", or describes an ordered sequence of steps.
 - Use Tags if the user just wants to mark which nodes belong to a
   subsystem ("the auth nodes", "the public surface") with no
   sequence implied.
+- If the user wants something time-based (latency, perf
+  regression, OTel traces), that's a feature we don't currently
+  ship — note it as out of scope and offer to capture the static
+  topology as a Journey instead.
 
 Add **Example 8: User wants to document a customer journey** that
 walks through:
@@ -286,7 +312,8 @@ Update **Preferred tools** section to list the 8 new MCP tools.
 ## Smoke test
 
 New `packages/loom-spec/scripts/smoke-mcp-journeys.ts` mirroring the
-timeline one. Asserts:
+existing `smoke-export-html.ts` shape (spawn the CLI, exercise the
+tools via stdio, assert byte-for-byte cleanup). Asserts:
 - All 8 tools register.
 - `list_journeys` returns empty initially.
 - `create_journey` writes a file; `read_journey` returns it.
@@ -306,8 +333,8 @@ Also extend `smoke-export-html.ts` with two cases:
 ## Docs
 
 New `documentation/journeys.md`: user-facing feature doc parallel to
-`export-html.md` and `import-trace.md`. Cover:
-- What a journey is and when to use it (vs timelines, vs tags).
+`export-html.md`. Cover:
+- What a journey is and when to use it (vs tags).
 - File format walkthrough.
 - CLI / MCP usage.
 - Export integration.

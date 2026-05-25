@@ -5,7 +5,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LoomDiagram } from "./types/diagram.js";
 import type { LoomNodeTypes } from "./types/node-types.js";
-import type { LoomTimeline } from "./types/timeline.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const schemaDir = resolve(here, "../schema");
@@ -15,7 +14,6 @@ addFormats(ajv);
 
 let diagramValidator: ReturnType<typeof ajv.compile> | null = null;
 let nodeTypesValidator: ReturnType<typeof ajv.compile> | null = null;
-let timelineValidator: ReturnType<typeof ajv.compile> | null = null;
 
 async function loadDiagramValidator() {
   if (diagramValidator) return diagramValidator;
@@ -33,15 +31,6 @@ async function loadNodeTypesValidator() {
   );
   nodeTypesValidator = ajv.compile(schema);
   return nodeTypesValidator;
-}
-
-async function loadTimelineValidator() {
-  if (timelineValidator) return timelineValidator;
-  const schema = JSON.parse(
-    await readFile(resolve(schemaDir, "timeline.schema.json"), "utf8")
-  );
-  timelineValidator = ajv.compile(schema);
-  return timelineValidator;
 }
 
 export type ValidationResult =
@@ -70,11 +59,4 @@ export async function validateNodeTypes(data: unknown): Promise<ValidationResult
   return { ok: false, errors: formatErrors(validator.errors ?? []) };
 }
 
-export async function validateTimeline(data: unknown): Promise<ValidationResult> {
-  const validator = await loadTimelineValidator();
-  const ok = validator(data);
-  if (ok) return { ok: true };
-  return { ok: false, errors: formatErrors(validator.errors ?? []) };
-}
-
-export type { LoomDiagram, LoomNodeTypes, LoomTimeline };
+export type { LoomDiagram, LoomNodeTypes };

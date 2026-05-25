@@ -1,4 +1,4 @@
-# Handover prompt — continue after v0.4.0 release
+# Handover prompt — continue after v0.5.0 release
 
 Copy everything in the fenced block below into a fresh Claude Code chat in the project root. It briefs the assistant on context, current state, conventions, and what's next.
 
@@ -7,8 +7,9 @@ Copy everything in the fenced block below into a fresh Claude Code chat in the p
 ````
 I'm continuing work on `loom-spec`, an open-source spec-as-code tool
 that keeps a node-based architecture spec inside the repo. You're
-picking up after v0.4.0 shipped. Read the briefing below, then read
-four docs in order, then propose what to do next.
+picking up after v0.5.0 shipped — which was a deliberate scope-down
+release that removed the timeline view. Read the briefing below,
+then read five docs in order, then propose what to do next.
 
 ## What loom-spec is (30 seconds)
 
@@ -16,41 +17,62 @@ A node-based architecture spec that lives in a repo. File kinds:
 
 - `.loom/diagrams/*.flow.json` — graph of nodes (components / services /
   data stores) and edges. One per subsystem; drill-down between them.
-- `.loom/timelines/*.timeline.json` — overlays one diagram with an
-  ordered, **timed** sequence of events. Each event references a node
-  id and has `start_ms`, `duration_ms`, `triggered_by`, `kind`, etc.
 - `.loom/exports.json` (optional) — named export bundles for the HTML
   exporter (include/exclude tags, single-diagram mode, etc.).
 
 The tool is a spec layer, NOT an execution layer. Nodes describe.
 The bet: keep the spec in the repo, edited by humans (browser-based
 editor) AND AI agents (via JSON directly OR via the MCP server we
-ship — 15 tools). Drift detection catches when `code_refs` point at
-code that no longer exists. Standalone HTML export embeds the same
-viewer into manuals / wikis / docs sites.
+ship — 10 tools for diagrams). Drift detection catches when
+`code_refs` point at code that no longer exists. Standalone HTML
+export embeds the same viewer into manuals / wikis / docs sites
+with tag-based filtering for public vs internal.
+
+## What v0.5.0 changed (critical context)
+
+v0.5.0 **removed** the Phase 2 timeline view that shipped in
+v0.2.0–v0.3.0 — TimelineView, TimelineCanvas, TransportBar, the 5
+timeline MCP tools, the OpenTelemetry trace importer, the OTLP-JSON
+parser, the smoke tests, the docs, everything. Reason: the only
+confirmed user (the author) didn't actually open the timeline view
+in practice, and the conceptual surface it added (events, tracks,
+playback, mini graph, edge pulse, OTel mapping) was raising the
+adoption barrier without delivering value for the use cases people
+actually care about.
+
+This is documented as Phase 4 in
+`documentation/done/phase-4-timeline-removal.md`. The original
+Phase 2 work is preserved in `documentation/done/phase-2-timeline.md`
+as honest history with a warning header.
+
+What was **kept** (because Journeys will reuse it):
+- `PulseEdge.tsx` — SVG-animated marker along an edge path.
+- `DiagramCanvas` `interactive={false}` mode with `activeNodeIds` +
+  `pulsingEdgeIds` props.
+- `exportMode.ts` runtime detector pattern.
 
 ## Where it stands right now
 
-- **`loom-spec@0.4.0`** is the latest on npm.
+- **`loom-spec@0.5.0`** is the latest on npm.
 - First real-world adoption confirmed (the author is using it on a
-  separate project; reports it works as expected).
+  separate project; reports the diagram editor + MCP tools + drift
+  + export work as expected).
 - Repo: https://github.com/renejes/loom-spec
 - Working directory: `/Users/renejesser/Desktop/Programming - Projekte/graphical-programming`
 - pnpm workspace; the package lives in `packages/loom-spec/`.
-- Phases 1 + 2 + 3 all shipped. Detail in `documentation/done/`.
 
-## Likely next chunk: Journeys (slated for v0.5.0)
+## The leading candidate for this session: Journeys (v0.6.0)
 
-The author wants a new file kind — **Journeys** — for documenting
-ordered, **untimed** workflows. Distinct from timelines (no
-`start_ms` / `duration_ms`) and from tags (sequence matters).
-Renders as a step-navigator with prev/next + a diagram pane that
-highlights the current step. Exportable as standalone HTML via
-`--from-journey <id>` analogous to the existing `--from-timeline`
-idea.
+A separate file kind for **guided, ordered, untimed walkthroughs**
+of the architecture. Renders as a step-navigator with prev/next +
+a diagram pane that highlights the current step's node. Exportable
+as standalone HTML via `--from-journey <id>`.
 
 Full plan in `documentation/journeys-plan.md`. ~6–7 h of focused
-work. **This is the leading candidate for the next session.**
+work. The plan was deliberately written to reuse the visual
+primitives that v0.5.0 kept (PulseEdge, DiagramCanvas non-
+interactive mode, etc.) so a lot of the rendering work is already
+done.
 
 ## What you should read in (in this order)
 
@@ -58,12 +80,15 @@ work. **This is the leading candidate for the next session.**
    how it's wired together. **Most important read.**
 2. `documentation/next-steps.md` — open backlog with priorities.
 3. `documentation/journeys-plan.md` — the plan for the next feature.
-4. `documentation/done/README.md` — index of what's already shipped,
-   linking out to per-phase archives. Skim to know what NOT to
-   re-propose.
-5. Skim `packages/loom-spec/src/view/components/TimelineView.tsx` —
-   Journeys will reuse a lot of its mini-graph + active-node patterns.
-6. Skim `packages/loom-spec/src/cli/exportHtml.ts` and
+4. `documentation/done/phase-4-timeline-removal.md` — the scope-down
+   reasoning. Read this to understand WHY we removed things, so
+   you don't accidentally propose re-adding them.
+5. `documentation/done/README.md` — index of what's shipped (and
+   what was rolled back), linking out to per-phase archives.
+6. Skim `packages/loom-spec/src/view/components/DiagramView.tsx`
+   and `packages/loom-spec/src/view/components/DiagramCanvas.tsx`
+   — Journeys will reuse the latter heavily.
+7. Skim `packages/loom-spec/src/cli/exportHtml.ts` and
    `packages/loom-spec/src/server/exportFilter.ts` — the
    `--from-journey` flag will hook into the existing filter cascade.
 
@@ -76,44 +101,38 @@ work. **This is the leading candidate for the next session.**
   `pnpm --filter loom-spec generate-types`. Don't hand-edit
   `src/types/*.ts`. **Adding Journeys means adding a new schema
   file** + extending the generate-types script + extending the
-  validator. Follow the same pattern as `timeline.schema.json`.
+  validator.
 - **Validation everywhere**: server PUTs validate against the
   schema before writing. Client-side validation runs on every
   diagram edit. Drift check walks `code_refs`. MCP tools
-  cross-check referential integrity (e.g. timeline events'
-  `node` must exist in the diagram). Journey steps will need
-  the same.
-- **Animation**: use `setInterval(16)` for animation loops, NOT
-  `requestAnimationFrame`. rAF is throttled to ≈0 in iframes /
-  hidden tabs, which broke playback verification before.
+  cross-check referential integrity (e.g. a Journey step's
+  `node` must exist in the diagram).
 - **The view's URL-hash router**: `useViewState()` parses
-  `location.hash` like `#diagram:overview` or `#timeline:foo`.
-  Empty hash → `diagram:overview`. **For Journeys add a
-  third variant** `#journey:<id>` and a `kind: "journey"`
-  branch in `ViewState`.
+  `location.hash` like `#diagram:overview`. Empty hash →
+  `diagram:overview`. **For Journeys add a `#journey:<id>` variant
+  and a `kind: "journey"` branch in `ViewState`** — the
+  discriminator is already there (currently `kind: "diagram"`
+  only), waiting for journeys.
 - **Export mode is runtime-detected** via `window.__LOOM_DATA__`.
   Any new loader / state hook MUST short-circuit when
   `isExportMode()` returns true (look at how
-  `state.ts` / `useTimelineState.ts` / `loadDiagram.ts` do it).
-- **`TimelineEvent` and `TimelineTrack`** are autogenerated type
-  names (not `Event`/`Track` — avoids DOM `Event` shadowing).
-  For Journeys, name the step type `JourneyStep` not `Step`.
+  `state.ts` / `loadDiagram.ts` do it).
 - **`String.replace` second-arg gotcha**: passing a STRING that
   contains `$$` corrupts the output (`$$` → `$`). Always pass a
   FUNCTION when the replacement contains arbitrary content (e.g.
   inlining a JS bundle). See the comment in
   `src/cli/exportHtml.ts` `buildHtml()` for the war story.
+- **Naming**: avoid `Event` / `Step` as top-level TS type names
+  (DOM `Event` shadowing). Use `JourneyStep` (matching the existing
+  habit of `TimelineEvent`-style names from the now-removed code).
+- **xyflow fitView clamps to minZoom**. For read-only embeds, we
+  override `minZoom: 0.05` so narrow panes don't get cropped.
 - **Diff stability**: server writes JSON with
-  `JSON.stringify(data, null, 2) + "\n"` and self-write suppression
-  (1.5s) so the UI doesn't react to its own saves. Don't break this.
-- **MCP server vs. HTTP server**: separate processes. The MCP
-  server doesn't have access to the chokidar watcher — that's
-  fine; MCP writes are external to the UI, chokidar picks them up
-  and the UI refetches via SSE.
-- **xyflow fitView clamps to minZoom**. For read-only embeds
-  (mini graph, export), we override `minZoom: 0.05` so narrow
-  panes don't get cropped. If you re-use DiagramCanvas in another
-  context, check this.
+  `JSON.stringify(data, null, 2) + "\n"` and self-write
+  suppression (1.5s). Don't break this.
+- **The Phase 4 mindset matters**: if a feature isn't earning its
+  keep, removing it is acceptable and encouraged. We just did it
+  to ~30% of the codebase. Don't hoard features.
 
 ## Tooling notes
 
@@ -123,26 +142,24 @@ work. **This is the leading candidate for the next session.**
   (port 7778) and Vite (port 7777 with proxy to 7778). There's also
   `loom-export-verify` which serves `/tmp/loom-export-verify/` via
   Python http.server on 8765 for testing exported HTML files.
-- Example fixture at `examples/todo-app/.loom/`. 2 diagrams + 1
-  timeline. Drift findings on the example are expected (it's a docs
-  fixture, not real code).
+- Example fixture at `examples/todo-app/.loom/`. 2 diagrams. Drift
+  findings on the example are expected (it's a docs fixture, not
+  real code).
 - `pnpm --filter loom-spec typecheck` and
   `pnpm --filter loom-spec validate-examples` are both fast (~1s).
   Run them after changes.
-- Smoke tests live in `packages/loom-spec/scripts/`. Three exist:
-  `smoke-mcp-timelines.ts`, `smoke-import-trace.ts`,
-  `smoke-export-html.ts`. Journeys should add a fourth
-  (`smoke-mcp-journeys.ts` per the plan). All clean up
-  byte-for-byte.
-- npm publishing: account has `auth-and-writes` 2FA. Classic
-  Automation tokens aren't available for newer accounts. Options:
-  (a) user runs `npm publish` interactively, types OTP; (b) user
-  temporarily switches 2FA mode to "Authorization only", publishes,
-  switches back.
+- Smoke test at `packages/loom-spec/scripts/smoke-export-html.ts`.
+  Journeys should add a second one (`smoke-mcp-journeys.ts` per the
+  plan). Both should clean up byte-for-byte.
+- npm publishing: account has `auth-and-writes` 2FA. The reliable
+  flow is `npm logout && npm login` (browser passkey) then
+  `npm publish` (interactive OTP). If the token in `~/.npmrc` ever
+  goes stale, `npm publish` will report E404 — that's actually
+  E401 in disguise; re-login fixes it.
 
 ## What I want from you on turn 1
 
-1. Confirm you've read the four docs.
+1. Confirm you've read the five docs.
 2. If you'd start with something other than Journeys, push back.
    I want a defensible alternative or agreement to proceed.
 3. Then propose the concrete first slice of Journeys work
@@ -151,12 +168,13 @@ work. **This is the leading candidate for the next session.**
    and we go.
 
 Tone: opinionated, honest about trade-offs, push back when I'm
-wrong. We've been moving fast — 30+ commits across the three
-phases. Keep that pace.
+wrong. The v0.5.0 scope-down is proof this project will cut
+features that don't earn their keep. Apply the same scrutiny going
+forward.
 
 Working directory is
 `/Users/renejesser/Desktop/Programming - Projekte/graphical-programming`.
-Start by reading the four docs.
+Start by reading the five docs.
 ````
 
 ---
@@ -165,7 +183,7 @@ Start by reading the four docs.
 
 1. Open a new Claude Code chat in the project working directory.
 2. Paste the entire fenced block above as your first message.
-3. The assistant should read the four docs, then come back with
+3. The assistant should read the five docs, then come back with
    questions or a plan. Confirm and proceed.
 
 If the assistant skips the reading step or starts coding

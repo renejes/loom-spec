@@ -1,5 +1,20 @@
 # Phase 2 — Timeline view (v0.2.0 → v0.3.0)
 
+> **⚠ Removed in v0.5.0.** Everything described below was real work
+> that shipped, but the only confirmed user never opened the timeline
+> view in practice. v0.5.0 stripped it all out to sharpen the product
+> story and shrink the conceptual surface. See
+> [`phase-4-timeline-removal.md`](./phase-4-timeline-removal.md) for
+> the scope-down details and what got salvaged for the upcoming
+> Journeys feature.
+>
+> This page stays as honest history. Pretending the timeline was never
+> built would lose useful context — both for understanding why some
+> code patterns exist (e.g. `PulseEdge`, `DiagramCanvas`
+> `interactive=false` mode, the export-mode runtime detector) and for
+> documenting that scope-downs are an acceptable move when an
+> assumption doesn't pan out.
+
 DAW-style timeline overlay on top of any diagram. Schema → renderer →
 edit mode → playback → mini-graph with edge pulse → MCP tools →
 OpenTelemetry trace import → +Add Event button → zoom + pan →

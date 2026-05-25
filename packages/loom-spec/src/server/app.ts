@@ -7,11 +7,8 @@ import {
   readDiagram,
   writeDiagram,
   readNodeTypes,
-  listTimelines,
-  readTimeline,
-  writeTimeline,
 } from "./fileOps.js";
-import { validateDiagram, validateNodeTypes, validateTimeline } from "../validate.js";
+import { validateDiagram, validateNodeTypes } from "../validate.js";
 import type { LoomRoot } from "./findLoomRoot.js";
 import type { LoomWatcher, LoomChangeEvent } from "./watch.js";
 
@@ -84,64 +81,6 @@ export function createApp({ loomRoot, watcher, serveSpaFrom }: AppOptions) {
 
     try {
       await writeDiagram(
-        loomRoot.loomPath,
-        id,
-        body as never,
-        (path) => watcher.markSelfWrite(path)
-      );
-      return c.json({ ok: true });
-    } catch (e) {
-      return c.json({ error: (e as Error).message }, 500);
-    }
-  });
-
-  // ─── Timelines ──────────────────────────────────────────────────
-
-  app.get("/api/timelines", async (c) => {
-    try {
-      const summaries = await listTimelines(loomRoot.loomPath);
-      return c.json(summaries);
-    } catch (e) {
-      return c.json({ error: (e as Error).message }, 500);
-    }
-  });
-
-  app.get("/api/timelines/:id", async (c) => {
-    const id = c.req.param("id");
-    try {
-      const data = await readTimeline(loomRoot.loomPath, id);
-      return c.json(data);
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code;
-      if (code === "ENOENT") return c.json({ error: "not found" }, 404);
-      return c.json({ error: (e as Error).message }, 500);
-    }
-  });
-
-  app.put("/api/timelines/:id", async (c) => {
-    const id = c.req.param("id");
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "invalid JSON" }, 400);
-    }
-
-    const result = await validateTimeline(body);
-    if (!result.ok) {
-      return c.json({ error: "validation failed", details: result.errors }, 422);
-    }
-
-    const tl = body as { id?: string };
-    if (tl.id !== id) {
-      return c.json(
-        { error: `body id "${tl.id}" does not match URL id "${id}"` },
-        400
-      );
-    }
-
-    try {
-      await writeTimeline(
         loomRoot.loomPath,
         id,
         body as never,

@@ -2,16 +2,14 @@ import { Moon, Sun, Plus, Check, Loader2, AlertCircle, ChevronLeft, Wifi, WifiOf
 import { useTheme } from "../theme";
 import type { SaveStatus, ConnectionStatus } from "../state";
 import { DiagramSwitcher } from "./DiagramSwitcher";
-import type { DiagramSummary, TimelineSummary } from "../loadDiagram";
+import type { DiagramSummary } from "../loadDiagram";
 import type { ViewState } from "../useViewState";
 
 interface Props {
-  viewKind: "diagram" | "timeline";
   viewId: string;
   title: string;
   subtitle?: string;
   diagrams: DiagramSummary[];
-  timelines: TimelineSummary[];
   saveStatus: SaveStatus;
   saveError: string | null;
   connectionStatus: ConnectionStatus;
@@ -96,12 +94,10 @@ function SaveIndicator({
 }
 
 export function TopBar({
-  viewKind,
   viewId,
   title,
   subtitle,
   diagrams,
-  timelines,
   saveStatus,
   saveError,
   connectionStatus,
@@ -129,11 +125,9 @@ export function TopBar({
         </button>
       )}
       <DiagramSwitcher
-        currentKind={viewKind}
         currentId={viewId}
         currentTitle={title}
         diagrams={diagrams}
-        timelines={timelines}
         onNavigate={onNavigate}
         onCreate={onCreateDiagram}
       />

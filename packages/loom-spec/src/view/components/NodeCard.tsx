@@ -37,7 +37,8 @@ export interface NodeCardData extends Record<string, unknown> {
   node: LoomNode;
   typeDef: NodeType | undefined;
   onDrillDown?: (id: string) => void;
-  /** Driven by the timeline playhead — true while an event on this node is currently active. */
+  /** True while this node is the focal "active" one in a read-only embed
+   *  (e.g. the current Journey step). Drives the node-color glow. */
   active?: boolean;
 }
 

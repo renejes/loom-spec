@@ -46,10 +46,12 @@ interface Props {
   onDrillDown?: (id: string) => void;
   /** When false: no drag, no connect, no selection, no delete-key. Default true. */
   interactive?: boolean;
-  /** Ids of nodes that should render with an "active" glow (e.g. driven by
-   *  the timeline playhead). */
+  /** Ids of nodes that should render with an "active" glow. Used by the
+   *  embedded mini-graph in non-interactive views (e.g. Journey step
+   *  highlight). Empty/undefined → no glow. */
   activeNodeIds?: ReadonlySet<string>;
-  /** Ids of edges that should render with a traveling pulse marker. */
+  /** Ids of edges that should render with a traveling pulse marker.
+   *  Same use-case as `activeNodeIds`. */
   pulsingEdgeIds?: ReadonlySet<string>;
 }
 

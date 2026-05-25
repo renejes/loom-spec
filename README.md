@@ -101,7 +101,7 @@ For internals — architecture, data flow, what's verified — see [documentatio
 
 ## Status
 
-`v0.4.0` on npm. Phase 1 (diagram editor + MCP) + Phase 2 (timeline view with edit, playback, mini graph, edge pulse, OTel trace import, +Event button, zoom, code-split) + Phase 3 (standalone interactive HTML export with tag-based filter + named bundles) all shipped. **First real-world adoption confirmed.** Next planned chunk: **Journeys** — a separate file kind for ordered, untimed workflow documentation (see [documentation/journeys-plan.md](documentation/journeys-plan.md)). The remaining backlog at [documentation/next-steps.md](documentation/next-steps.md) is mostly polish.
+`v0.5.0` on npm. Phase 1 (diagram editor + 10 MCP tools) + Phase 3 (standalone interactive HTML export with tag-based filter + named bundles) shipped. **First real-world adoption confirmed.** v0.5.0 is also a deliberate **scope-down**: the Phase 2 timeline view (built in v0.2.0–v0.3.0 as a DAW-style architecture playback) and the OpenTelemetry trace importer were removed because the only confirmed user didn't actually use them — see [documentation/done/phase-4-timeline-removal.md](documentation/done/phase-4-timeline-removal.md) for the reasoning. Next planned chunk: **Journeys** — a separate file kind for ordered, untimed workflow documentation (see [documentation/journeys-plan.md](documentation/journeys-plan.md)).
 
 [CHANGELOG via GitHub releases](https://github.com/renejes/loom-spec/releases).
 

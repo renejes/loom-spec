@@ -14,16 +14,12 @@
  */
 import type { LoomDiagram } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
-import type { LoomTimeline } from "../types/timeline";
 
 export interface ExportData {
   /** ISO timestamp when the export was generated. */
   generatedAt: string;
   /** Map of diagram id → full diagram doc. */
   diagrams: Record<string, LoomDiagram>;
-  /** Map of timeline id → full timeline doc. May be empty if exported with
-   *  --no-timelines. */
-  timelines: Record<string, LoomTimeline>;
   nodeTypes: LoomNodeTypes;
 }
 

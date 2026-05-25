@@ -6,7 +6,7 @@ This directory contains the node-based architecture spec for the project. It is 
 
 - `node-types.json` — defines the available node types for this project. Customize freely; add types specific to your domain.
 - `diagrams/*.flow.json` — one file per subsystem. Each is a self-contained graph.
-- `timelines/*.timeline.json` — (future) time-axis views for sequenced behavior.
+- `exports.json` — (optional) named export bundles for `loom-spec export-html` (e.g. a `user-manual` bundle that filters to `tags: ["public"]`).
 
 ## Viewing and editing
 
