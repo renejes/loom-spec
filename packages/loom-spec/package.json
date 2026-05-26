@@ -1,6 +1,6 @@
 {
   "name": "loom-spec",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Node-based architecture spec that lives in your repo. AI-readable, AI-writable, git-diffable.",
   "type": "module",
   "author": "René Jesser",
@@ -47,7 +47,8 @@
     "./node-types-schema": "./schema/node-types.schema.json"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && vite build --config src/view/vite.config.ts && vite build --config src/view/vite.config.export.ts",
+    "clean": "rm -rf dist",
+    "build": "pnpm clean && tsc -p tsconfig.json && vite build --config src/view/vite.config.ts && vite build --config src/view/vite.config.export.ts",
     "build:export": "vite build --config src/view/vite.config.export.ts",
     "dev": "concurrently -n server,view -c blue,magenta \"pnpm dev:server\" \"pnpm dev:view\"",
     "dev:server": "tsx src/cli/index.ts view --dev --root ../../examples/todo-app --port 7778",
@@ -55,7 +56,9 @@
     "init:example": "tsx src/cli/index.ts init --path /tmp/loom-init-test --force",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/view/tsconfig.json --noEmit",
     "generate-types": "tsx scripts/generate-types.ts",
-    "validate-examples": "tsx scripts/validate-examples.ts"
+    "validate-examples": "tsx scripts/validate-examples.ts",
+    "prepublishOnly": "pnpm run build && pnpm run check-dist",
+    "check-dist": "tsx scripts/check-dist.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

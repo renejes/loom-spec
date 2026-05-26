@@ -1,4 +1,4 @@
-# Handover prompt — continue after v0.8.0 release
+# Handover prompt — continue after v0.8.1 release
 
 Copy everything in the fenced block below into a fresh Claude Code chat in the project root. It briefs the assistant on context, current state, conventions, and what's next.
 
@@ -7,11 +7,13 @@ Copy everything in the fenced block below into a fresh Claude Code chat in the p
 ````
 I'm continuing work on `loom-spec`, an open-source spec-as-code tool
 that keeps a node-based architecture spec inside the repo. You're
-picking up after v0.8.0 shipped — signature-drift detection in
-Python/TS/Rust/Svelte, the feature that closes the gap between "the
-symbol still exists" and "the symbol still does what the spec
-claims". Read the briefing below, then read five docs in order, then
-propose what to do next.
+picking up after v0.8.1 — a bug-fix release that actually delivers
+the Phase 7+8 features which v0.8.0 fumbled at publish time (stale
+`dist/` shipped to npm, see `done/phase-9-publish-fix.md`). The
+underlying features (signature drift, edge vocabulary) are
+correctly v0.8.0-vintage work — read those archives for the
+substance. Read the briefing below, then read the five docs in
+order, then propose what to do next.
 
 ## What loom-spec is (30 seconds)
 
@@ -131,7 +133,7 @@ Deliberate non-additions in this phase:
 
 ## Where it stands right now
 
-- **`loom-spec@0.8.0`** is the latest on npm.
+- **`loom-spec@0.8.1`** is the latest on npm. (v0.8.0 was broken on publish — Phase 9.)
 - Real-world adoption confirmed (the author uses it on a separate
   project; the diagram editor + MCP tools + drift detection + export
   + signature-fingerprint workflow all see real use. Journey use is
@@ -253,6 +255,11 @@ based on real pain, or wait for it. Top candidates:
   `npm publish` (interactive OTP). If the token in `~/.npmrc` ever
   goes stale, `npm publish` will report E404 — that's actually
   E401 in disguise; re-login fixes it.
+- **`prepublishOnly` and `check-dist` are now in place** — `npm publish`
+  automatically runs `pnpm run build && pnpm run check-dist` first.
+  You don't need to manually build before publishing anymore (and
+  shouldn't try — `check-dist` will refuse to ship a stale tarball).
+  If `check-dist` fails: read the error, fix the cause, retry.
 
 ## What I want from you on turn 1
 

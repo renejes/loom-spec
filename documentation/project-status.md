@@ -17,7 +17,9 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.8.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
+**v0.8.1 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
+
+v0.8.1 is a bug-fix release ([Phase 9](./done/phase-9-publish-fix.md)) — v0.8.0 shipped with a stale `dist/` directory, so the Phase 7 (signature drift) and Phase 8 (edge vocabulary) modules weren't actually in the published tarball. The features themselves were correct, but the build wasn't run before publish. Added a `prepublishOnly` hook plus a `check-dist` manifest verifier so no future publish can ship without the expected files. Use v0.8.1, not v0.8.0.
 
 v0.8.0 adds two related features:
 
@@ -40,6 +42,7 @@ For per-version detail of what shipped when, see [`done/`](./done/):
 - [Phase 6 — Quality-of-life round](./done/phase-6-quality-of-life.md) (v0.7.0)
 - [Phase 7 — Signature-drift detection](./done/phase-7-signature-drift.md) (v0.8.0)
 - [Phase 8 — Edge property vocabulary](./done/phase-8-edge-vocabulary.md) (v0.8.0)
+- [Phase 9 — Publish hygiene fix](./done/phase-9-publish-fix.md) (v0.8.1)
 
 ## Capabilities at a glance
 
@@ -173,7 +176,8 @@ End-to-end checks that currently pass (via `pnpm --filter loom-spec typecheck` p
 - **Signatures smoke** (`scripts/smoke-signatures.ts`, 30 assertions) — 16 extractor unit checks (Python/TS/Rust/Svelte canonical shapes incl. generics, lifetimes, async, modifiers, multi-line) + 14 end-to-end (write source in 4 languages, capture hints, mutate a signature, detect drift, recapture acknowledges new baseline).
 - **Edge-vocab smoke** (`scripts/smoke-edge-vocab.ts`, 11 assertions) — unit checks for each failure mode (unknown key / wrong type / bad enum / out-of-range / required-missing) plus end-to-end via `runDriftCheck`.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite. Plus `dist/view-export/` (single chunk) for the standalone HTML embed.
-- npm-installed flow via the published `loom-spec@0.8.0`.
+- npm-installed flow via the published `loom-spec@0.8.1` (v0.8.0 shipped broken; see Phase 9).
+- `prepublishOnly` + `check-dist` script guarantee that future publishes can't ship a stale `dist/`.
 - Real-world use: the author's day-to-day project uses the diagram editor + MCP tools + drift validation + HTML export.
 
 ## What is not yet verified
