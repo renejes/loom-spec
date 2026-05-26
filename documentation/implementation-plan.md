@@ -7,19 +7,9 @@ of the codebase, see [`project-status.md`](./project-status.md).
 
 ## Active
 
-### Journeys — guided ordered walkthroughs of an architecture
-
-Full plan in [`journeys-plan.md`](./journeys-plan.md). Goal: a separate
-file kind for "user journey" / "workflow" documentation — an ordered
-list of steps, each tied to a node in a diagram. Different from tags
-(sequence matters) and from the now-removed Timeline view (no
-`start_ms` / `duration_ms`). Renders as a step-navigator with prev/next
-plus a diagram pane that highlights the current and visited nodes.
-Exportable as a standalone HTML via `--from-journey <id>`.
-
-The plan reuses `PulseEdge` and `DiagramCanvas`'s `activeNodeIds` /
-`pulsingEdgeIds` props (both originally built for the timeline mini
-graph, kept after the Phase 4 scope-down specifically for this).
+_Nothing currently in flight._ See [`next-steps.md`](./next-steps.md)
+for the backlog. The Journeys feature shipped as v0.6.0 — see
+[`done/phase-5-journeys.md`](./done/phase-5-journeys.md).
 
 ## Backlog (planning sketches)
 

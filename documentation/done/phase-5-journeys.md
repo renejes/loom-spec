@@ -1,4 +1,20 @@
-# Journeys — implementation plan
+# Phase 5 — Journeys (v0.6.0)
+
+**Shipped as `loom-spec@0.6.0`.** This file is the original
+implementation plan, archived as honest history. For the user-facing
+feature doc see [`../journeys.md`](../journeys.md). For the current
+state see [`../project-status.md`](../project-status.md).
+
+## What actually shipped vs. the plan
+
+| Plan | Reality |
+|---|---|
+| `JourneyView` with editor affordances (`+ Step`, per-step delete/edit) | **Read-only first.** Editing goes through MCP; UI editor deferred until a real pain point emerges. |
+| Visited-only node highlighting | Added a **dimmed** state for nodes outside the journey entirely (~28% opacity, hover restores). The plan kept non-journey nodes at full opacity; in practice that was too noisy — the dimming is what makes a journey feel focused. |
+| Per-step pulse for the whole "path so far" | Single pulse only — the edge between the previous step's node and the current one. Multiple simultaneous pulses competed visually. |
+| 4 slices estimated at ~6.5–7 h | Shipped in 4 slices, all green: schema/types/routes/fixture; 8 MCP tools + stdio smoke; read-only viewer + switcher; HTML export with `--from-journey`. SKILL/docs + version bump separately. |
+
+## Original plan
 
 A separate file kind for **guided, ordered, untimed walkthroughs** of
 the architecture. Renders as a step-navigator with prev/next buttons
@@ -8,7 +24,7 @@ interactive product tours.
 
 This is the planned replacement for the Phase 2 timeline view (which
 was removed in v0.5.0 — see
-[`done/phase-4-timeline-removal.md`](./done/phase-4-timeline-removal.md)
+[`./phase-4-timeline-removal.md`](./phase-4-timeline-removal.md)
 for the scope-down reasoning). Same "show me the relevant slice of
 the architecture for this workflow" need, with a much lighter mental
 model.

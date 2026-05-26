@@ -91,6 +91,36 @@ public export. Either remove the sensitive ref / rewrite the
 description, or split the node into a public surface and an internal
 implementation node and tag accordingly.
 
+### When the user wants to document a workflow
+
+A **Journey** (`.loom/journeys/<id>.journey.json`) is an ordered list
+of steps, each tied to a node in a diagram. Renders in the viewer as a
+step-navigator (prev/next, current step glows, prior steps subtly
+highlighted, non-journey nodes dimmed). Exportable via
+`loom-spec export-html --from-journey <id>` as a focused walkthrough
+HTML.
+
+**Default to a Journey when the user says:** "user journey", "customer
+journey", "workflow", "step-by-step", "onboarding", "tour", "guided
+walkthrough", "deploy runbook", or describes an *ordered sequence of
+steps* through the architecture.
+
+**Default to Tags when the user says:** "the auth nodes", "everything
+in the billing subsystem", "the public surface" — i.e. wants to mark
+a *set* of nodes without implying any sequence between them.
+
+**Out of scope** — if the user wants something time-based (latency
+measurements, perf regression replay, OpenTelemetry traces), loom-spec
+doesn't ship that anymore (it was removed in v0.5.0). Capture the
+static topology as a Journey instead and note the timing gap.
+
+Composing: a Journey can include nodes that are also tagged `public`,
+and an export bundle can apply tag filters on top of a journey (tag
+filters prune nodes, the journey then prunes steps whose nodes are
+gone). When both shape the same export, the cascade is: tag filter
+narrows nodes → journey scope narrows further → any journey step
+whose node was dropped gets removed.
+
 ## Preferred tools (when the MCP server is wired up)
 
 If a `loom-spec` MCP server is registered with the host (e.g. via
@@ -100,6 +130,11 @@ If a `loom-spec` MCP server is registered with the host (e.g. via
 - `loom_add_node`, `loom_update_node`, `loom_mark_stale`, `loom_delete_node`
 - `loom_add_edge`, `loom_delete_edge`
 - `loom_validate` (schema + code-ref drift across every diagram)
+- `loom_list_journeys`, `loom_read_journey`
+- `loom_create_journey`, `loom_add_step`, `loom_update_step`,
+  `loom_delete_step`, `loom_reorder_steps`, `loom_delete_journey`
+  (all cross-check that referenced nodes exist in the journey's diagram
+  before writing)
 
 They validate against the schema before writing, so invalid edits fail fast
 instead of corrupting the file. They're also more token-efficient than
@@ -111,12 +146,15 @@ rules above — the format is stable and tools-agnostic by design.
 For exporting the spec to a self-contained interactive HTML (for manuals,
 docs sites, GitHub Pages, embed-in-Notion, etc.), use the CLI:
 
-- `loom-spec export-html` (full export)
+- `loom-spec export-html` (full export — diagrams + journeys)
 - `loom-spec export-html <bundle-name>` (from `.loom/exports.json`)
 - `loom-spec export-html --include-tag public --out manual.html`
   (ad-hoc filter)
+- `loom-spec export-html --from-journey checkout --out tour.html`
+  (focused walkthrough HTML — opens at #journey:checkout by default)
 
-See Example 6 for the full workflow.
+See Example 6 (tag-filtered export) and Example 7 (journey-scoped
+export).
 
 ---
 
@@ -345,6 +383,66 @@ $ loom-spec export-html user-manual
 generated `.html` belongs in the change that updates the architecture,
 not in an automated commit triggered by every `.loom/` edit.
 
+### 7. User wants a step-by-step walkthrough of a workflow
+
+> User: "Build me an interactive walkthrough of the checkout flow that
+> I can drop in our onboarding docs."
+
+```
+# Step 1: Confirm the diagram exists (create it if not).
+loom_list_diagrams()
+# → confirms 'overview' has checkout-page, checkout-api, payments-service, …
+
+# Step 2: Create the journey, scoped to that diagram.
+loom_create_journey({
+  id: "checkout",
+  title: "Customer Checkout",
+  diagram: "overview",
+  description: "From the cart button to the confirmation page."
+})
+
+# Step 3: Add steps in order. Each step.node must exist in the diagram —
+# the tool cross-checks before writing.
+loom_add_step({
+  journey: "checkout",
+  node: "checkout-page",
+  title: "User clicks Pay",
+  description: "Cart view captures the click and POSTs to the API.",
+  code_refs: [{ path: "src/views/Checkout.tsx", symbol: "handlePay" }]
+})
+loom_add_step({
+  journey: "checkout",
+  node: "checkout-api",
+  title: "API validates and charges",
+  description: "POST /checkout/charge runs validation, calls Payments."
+})
+loom_add_step({
+  journey: "checkout",
+  node: "payments-service",
+  title: "Stripe charge",
+  description: "createCharge → returns success | failure."
+})
+
+# Step 4: Optionally record a named bundle so anyone can re-export it.
+# .loom/exports.json (write the file directly; no MCP tool):
+{
+  "exports": {
+    "checkout-tour": {
+      "from-journey": "checkout",
+      "out": "docs/checkout-walkthrough.html"
+    }
+  }
+}
+
+# Step 5: Export. The HTML opens at #journey:checkout by default —
+# the reader steps through prev/next and sees the diagram narrow to
+# just the journey's nodes.
+$ loom-spec export-html checkout-tour
+```
+
+When the user later refactors `handlePay`, run `loom_validate` — drift
+catches dead `code_refs` on journey steps too.
+
 ---
 
 ## Format reference
@@ -379,3 +477,19 @@ not in an automated commit triggered by every `.loom/` edit.
   run and obscure the source of truth.
 - Don't add `loom-spec export-html` to `init` defaults or auto-run it
   from a hook. Exports are intentional, not background.
+- Don't create a Journey for a sequence that's < 3 steps — the reader
+  can take in the static diagram. Journeys carry overhead (separate
+  file, step-by-step UI) only worth it when the walkthrough adds
+  value over the plain view.
+- Don't put `code_refs` on a Journey step that duplicate the
+  underlying node's `code_refs` — step-level refs are for *narrowing
+  focus* to a specific symbol within the node's code, not for
+  restating what the node already says.
+- Don't reuse step `id`s across journeys to mean different things —
+  the system doesn't enforce uniqueness across journeys, but
+  consistent ids (e.g. `click-pay` across all checkout-flavoured
+  journeys) make diffs and refactors readable.
+- Don't `loom_delete_journey` to "tidy up" — journeys are
+  documentation artefacts that often have value as history. Rename or
+  archive instead. The MCP tool description nudges in the same
+  direction.
