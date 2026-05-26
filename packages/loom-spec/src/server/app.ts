@@ -7,8 +7,16 @@ import {
   readDiagram,
   writeDiagram,
   readNodeTypes,
+  listJourneys,
+  readJourney,
+  writeJourney,
 } from "./fileOps.js";
-import { validateDiagram, validateNodeTypes } from "../validate.js";
+import {
+  validateDiagram,
+  validateNodeTypes,
+  validateJourney,
+} from "../validate.js";
+import type { LoomJourney } from "../types/journey.js";
 import type { LoomRoot } from "./findLoomRoot.js";
 import type { LoomWatcher, LoomChangeEvent } from "./watch.js";
 
@@ -84,6 +92,101 @@ export function createApp({ loomRoot, watcher, serveSpaFrom }: AppOptions) {
         loomRoot.loomPath,
         id,
         body as never,
+        (path) => watcher.markSelfWrite(path)
+      );
+      return c.json({ ok: true });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 500);
+    }
+  });
+
+  app.get("/api/journeys", async (c) => {
+    try {
+      const summaries = await listJourneys(loomRoot.loomPath);
+      return c.json(summaries);
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 500);
+    }
+  });
+
+  app.get("/api/journeys/:id", async (c) => {
+    const id = c.req.param("id");
+    try {
+      const data = await readJourney(loomRoot.loomPath, id);
+      return c.json(data);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return c.json({ error: "not found" }, 404);
+      return c.json({ error: (e as Error).message }, 500);
+    }
+  });
+
+  app.put("/api/journeys/:id", async (c) => {
+    const id = c.req.param("id");
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+
+    const schemaResult = await validateJourney(body);
+    if (!schemaResult.ok) {
+      return c.json(
+        { error: "validation failed", details: schemaResult.errors },
+        422
+      );
+    }
+
+    const journey = body as LoomJourney;
+    if (journey.id !== id) {
+      return c.json(
+        { error: `body id "${journey.id}" does not match URL id "${id}"` },
+        400
+      );
+    }
+
+    // Referential integrity: the journey's diagram must exist, and every
+    // step.node must resolve to a node in that diagram.
+    let diagram;
+    try {
+      diagram = await readDiagram(loomRoot.loomPath, journey.diagram);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        return c.json(
+          {
+            error: "validation failed",
+            details: [`/diagram: references unknown diagram "${journey.diagram}"`],
+          },
+          422
+        );
+      }
+      return c.json({ error: (e as Error).message }, 500);
+    }
+    const nodeIds = new Set(diagram.nodes.map((n) => n.id));
+    const stepErrors: string[] = [];
+    const seenStepIds = new Set<string>();
+    journey.steps.forEach((step, i) => {
+      if (seenStepIds.has(step.id)) {
+        stepErrors.push(`/steps/${i}/id: duplicate step id "${step.id}"`);
+      }
+      seenStepIds.add(step.id);
+      if (!nodeIds.has(step.node)) {
+        stepErrors.push(
+          `/steps/${i}/node: node "${step.node}" does not exist in diagram "${journey.diagram}"`
+        );
+      }
+    });
+    if (stepErrors.length > 0) {
+      return c.json({ error: "validation failed", details: stepErrors }, 422);
+    }
+
+    try {
+      await writeJourney(
+        loomRoot.loomPath,
+        id,
+        journey,
         (path) => watcher.markSelfWrite(path)
       );
       return c.json({ ok: true });

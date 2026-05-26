@@ -14,6 +14,7 @@ const outDir = resolve(here, "../src/types");
 const targets = [
   { schema: "diagram.schema.json", out: "diagram.ts" },
   { schema: "node-types.schema.json", out: "node-types.ts" },
+  { schema: "journey.schema.json", out: "journey.ts" },
 ];
 
 await mkdir(outDir, { recursive: true });

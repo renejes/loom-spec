@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "id": "complete-a-todo",
+  "title": "Complete a Todo",
+  "description": "User toggles a todo as done. Walks from the UI through the API to the database.",
+  "diagram": "overview",
+  "steps": [
+    {
+      "id": "user-toggles",
+      "node": "todo-list-view",
+      "title": "User clicks the toggle",
+      "description": "The Todo List view captures the click and dispatches a PATCH request.",
+      "code_refs": [
+        {
+          "path": "src/views/TodoList.tsx",
+          "symbol": "handleToggle"
+        }
+      ]
+    },
+    {
+      "id": "api-receives",
+      "node": "todo-api",
+      "title": "API handles the request",
+      "description": "PATCH /todos/:id validates the payload and writes through to the store."
+    },
+    {
+      "id": "store-updated",
+      "node": "todo-store",
+      "title": "Store row updated",
+      "description": "The persisted row flips `done: true` and the response cascades back to the UI."
+    }
+  ]
+}

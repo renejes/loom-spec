@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loom-spec.dev/schema/journey-v1.json",
+  "title": "Loom Journey",
+  "description": "An ordered, untimed walkthrough of a diagram. Each step references a node; the renderer highlights nodes one at a time as the reader advances.",
+  "type": "object",
+  "required": ["version", "id", "title", "diagram", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Journey identifier. Should match the filename without extension."
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": {
+      "type": "string",
+      "description": "Markdown allowed. Renders above the step list."
+    },
+    "diagram": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "ID of the diagram this journey walks through. Every step.node must exist in this diagram."
+    },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/JourneyStep" },
+      "default": []
+    }
+  },
+
+  "$defs": {
+    "JourneyStep": {
+      "type": "object",
+      "required": ["id", "node"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Unique within this journey."
+        },
+        "node": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "ID of a node in the journey's diagram. Validated by the server / MCP tools."
+        },
+        "title": { "type": "string", "maxLength": 80 },
+        "description": {
+          "type": "string",
+          "description": "Markdown allowed. Narrates what happens at this step."
+        },
+        "code_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CodeRef" },
+          "default": [],
+          "description": "Optional step-level code refs. Use to narrow focus to a specific symbol within the node's code; if redundant with the node's code_refs, omit."
+        }
+      }
+    },
+
+    "CodeRef": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Repo-relative file path."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Function, class, or component name. Preferred over lines because it survives refactors."
+        },
+        "lines": {
+          "type": "string",
+          "pattern": "^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$",
+          "description": "Line range(s) like '1-80' or '12,45-50'. Use only when no symbol applies."
+        }
+      }
+    }
+  }
+}
