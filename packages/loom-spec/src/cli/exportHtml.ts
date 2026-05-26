@@ -6,11 +6,14 @@ import {
   listDiagrams,
   readDiagram,
   readNodeTypes,
+  listJourneys,
+  readJourney,
 } from "../server/fileOps.js";
 import { applyFilter, type FilterSpec } from "../server/exportFilter.js";
 import { loadExportsConfig } from "../server/exportConfig.js";
 import type { LoomDiagram } from "../types/diagram.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
+import type { LoomJourney } from "../types/journey.js";
 
 export interface ExportHtmlArgs {
   /** Output file path. Default: "loom.html" in cwd. */
@@ -23,15 +26,28 @@ export interface ExportHtmlArgs {
   includeTags?: string[];
   /** Drop nodes carrying any of these tags. */
   excludeTags?: string[];
+  /** Scope the export to a single journey: implicitly narrows the
+   *  diagram to the journey's nodes and embeds only that journey. The
+   *  resulting HTML opens at #journey:<id> by default. */
+  fromJourney?: string;
   /** Named bundle from .loom/exports.json. Settings from the bundle become
    *  defaults; explicit CLI flags override. */
   bundle?: string;
 }
 
+interface DefaultView {
+  kind: "diagram" | "journey";
+  id: string;
+}
+
 interface ExportData {
   generatedAt: string;
   diagrams: Record<string, LoomDiagram>;
+  journeys?: Record<string, LoomJourney>;
   nodeTypes: LoomNodeTypes;
+  /** Which view the standalone HTML should land on when the URL hash is
+   *  empty. Set by --from-journey; omitted otherwise. */
+  defaultView?: DefaultView;
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -86,9 +102,27 @@ async function loadAllData(args: ExportHtmlArgs): Promise<ExportData> {
     }
   }
 
+  // Journeys — when scoped via --from-journey, ship just that one. Otherwise
+  // ship all journeys; the cascade in applyFilter drops the ones whose
+  // diagrams didn't make it through tag filtering.
+  let journeys: Record<string, LoomJourney> | undefined;
+  if (args.fromJourney) {
+    const j = await readJourney(loomRoot.loomPath, args.fromJourney);
+    journeys = { [args.fromJourney]: j };
+  } else {
+    const summaries = await listJourneys(loomRoot.loomPath);
+    if (summaries.length > 0) {
+      journeys = {};
+      for (const s of summaries) {
+        journeys[s.id] = await readJourney(loomRoot.loomPath, s.id);
+      }
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     diagrams,
+    journeys,
     nodeTypes,
   };
 }
@@ -183,7 +217,26 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
       diagram: args.diagram ?? bundle.diagram,
       includeTags: args.includeTags ?? bundle.includeTags,
       excludeTags: args.excludeTags ?? bundle.excludeTags,
+      fromJourney: args.fromJourney ?? bundle.fromJourney,
     };
+  }
+
+  // --from-journey implies a single-diagram export of the journey's
+  // diagram, unless the user explicitly overrode --diagram. Do this after
+  // the bundle merge so that bundle's fromJourney also gets the implicit
+  // diagram narrowing.
+  if (effective.fromJourney && !effective.diagram) {
+    const loomRoot = await findLoomRoot(effective.root);
+    const j = await readJourney(loomRoot.loomPath, effective.fromJourney).catch(
+      () => null
+    );
+    if (!j) {
+      console.error(
+        `export-html: journey '${effective.fromJourney}' not found in .loom/journeys/.`
+      );
+      process.exit(1);
+    }
+    effective = { ...effective, diagram: j.diagram };
   }
 
   const bundleDir = await findExportBundle();
@@ -200,9 +253,27 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
     process.exit(1);
   }
 
+  // Build the journey-scope restriction, if any. The journey was already
+  // loaded into data.journeys by loadAllData.
+  let fromJourneyScope: FilterSpec["fromJourney"] | undefined;
+  if (effective.fromJourney) {
+    const j = data.journeys?.[effective.fromJourney];
+    if (!j) {
+      console.error(
+        `export-html: journey '${effective.fromJourney}' could not be loaded.`
+      );
+      process.exit(1);
+    }
+    fromJourneyScope = {
+      diagramId: j.diagram,
+      nodeIds: new Set(j.steps.map((s) => s.node)),
+    };
+  }
+
   const filterSpec: FilterSpec = {
     includeTags: effective.includeTags,
     excludeTags: effective.excludeTags,
+    fromJourney: fromJourneyScope,
   };
   const { payload: filtered, summary } = applyFilter(data, filterSpec);
 
@@ -225,9 +296,23 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
     process.exit(1);
   }
 
+  // If --from-journey was set, ensure the journey we asked for actually
+  // survived the cascade. If it didn't, the user has a broken bundle (tag
+  // filter dropped all the journey's nodes) — fail loud.
+  if (effective.fromJourney && !filtered.journeys?.[effective.fromJourney]) {
+    console.error(
+      `export-html: --from-journey '${effective.fromJourney}' produced no surviving steps after filtering — refusing to write.`
+    );
+    process.exit(1);
+  }
+
   const finalData: ExportData = {
     ...data,
     diagrams: filtered.diagrams,
+    journeys: filtered.journeys,
+    defaultView: effective.fromJourney
+      ? { kind: "journey", id: effective.fromJourney }
+      : undefined,
   };
 
   const html = buildHtml(bundleHtml, bundleCss, bundleJs, finalData, {
@@ -239,16 +324,22 @@ export async function runExportHtml(args: ExportHtmlArgs): Promise<void> {
 
   const sizeKb = Math.round(Buffer.byteLength(html, "utf8") / 1024);
   const diagramCount = Object.keys(finalData.diagrams).length;
-  console.log(
-    `Wrote ${outPath} (${sizeKb} kB): ` +
-      `${diagramCount} diagram${diagramCount === 1 ? "" : "s"}.`
-  );
+  const journeyCount = Object.keys(finalData.journeys ?? {}).length;
+  const parts = [`${diagramCount} diagram${diagramCount === 1 ? "" : "s"}`];
+  if (journeyCount > 0) {
+    parts.push(`${journeyCount} journey${journeyCount === 1 ? "" : "s"}`);
+  }
+  console.log(`Wrote ${outPath} (${sizeKb} kB): ${parts.join(", ")}.`);
   const droppedParts: string[] = [];
   if (summary.nodesDropped > 0) droppedParts.push(`${summary.nodesDropped} nodes`);
   if (summary.edgesDropped > 0) droppedParts.push(`${summary.edgesDropped} edges`);
   if (summary.groupsDropped > 0) droppedParts.push(`${summary.groupsDropped} groups`);
   if (summary.drillDownsCleared > 0)
     droppedParts.push(`${summary.drillDownsCleared} drill-down refs`);
+  if (summary.journeyStepsDropped > 0)
+    droppedParts.push(`${summary.journeyStepsDropped} journey steps`);
+  if (summary.journeysDropped > 0)
+    droppedParts.push(`${summary.journeysDropped} journeys`);
   if (droppedParts.length > 0) {
     console.log(`Filter dropped: ${droppedParts.join(", ")}.`);
   }

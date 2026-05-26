@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getExportData } from "./exportMode";
 
 export type ViewKind = "diagram" | "journey";
 
@@ -13,7 +14,13 @@ const DEFAULT_VIEW: ViewState = { kind: "diagram", id: DEFAULT_DIAGRAM_ID };
 function readHash(): ViewState {
   if (typeof location === "undefined") return DEFAULT_VIEW;
   const raw = location.hash.replace(/^#/, "").trim();
-  if (!raw) return DEFAULT_VIEW;
+  if (!raw) {
+    // Empty hash → standalone exports may carry a defaultView hint (set by
+    // `loom-spec export-html --from-journey`). Falls back to overview.
+    const exportDefault = getExportData()?.defaultView;
+    if (exportDefault) return { kind: exportDefault.kind, id: exportDefault.id };
+    return DEFAULT_VIEW;
+  }
   if (raw.startsWith("diagram:")) {
     const id = raw.slice("diagram:".length).trim();
     return id ? { kind: "diagram", id } : DEFAULT_VIEW;

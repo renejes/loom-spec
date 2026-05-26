@@ -25,6 +25,10 @@ export interface ExportData {
    *  any journeys omit this field. Filled in by the HTML exporter. */
   journeys?: Record<string, LoomJourney>;
   nodeTypes: LoomNodeTypes;
+  /** Which view the standalone HTML should land on when the URL hash is
+   *  empty. Set by --from-journey; omitted otherwise (in which case the
+   *  viewer defaults to diagram:overview). */
+  defaultView?: { kind: "diagram" | "journey"; id: string };
 }
 
 declare global {

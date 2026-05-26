@@ -80,6 +80,8 @@ async function main() {
 
     const data = extractLoomData(html) as {
       diagrams?: Record<string, { id: string; nodes: unknown[] }>;
+      journeys?: Record<string, { id: string; steps: unknown[] }>;
+      defaultView?: { kind: string; id: string };
       nodeTypes?: { types?: Record<string, unknown> };
       generatedAt?: string;
     } | null;
@@ -92,6 +94,10 @@ async function main() {
     expect("generatedAt is an ISO timestamp",
       typeof data?.generatedAt === "string" &&
         /\d{4}-\d{2}-\d{2}T/.test(data!.generatedAt));
+    expect("Default export ships journeys map",
+      !!data?.journeys && "complete-a-todo" in data.journeys);
+    expect("Default export does not set defaultView",
+      data?.defaultView === undefined);
 
     await unlink(outPath);
 
@@ -169,6 +175,84 @@ async function main() {
       overview5?.nodes.length === 4);
     await unlink(outPath);
 
+    // ─── --from-journey complete-a-todo ─────────────────────────────
+    execFileSync(
+      "pnpm",
+      ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+       "export-html", "--root", fixture, "--out", outPath,
+       "--from-journey", "complete-a-todo"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    const htmlJ = await readFile(outPath, "utf8");
+    const dataJ = extractLoomData(htmlJ) as {
+      diagrams?: Record<string, { nodes: { id: string }[]; edges: { id: string }[] }>;
+      journeys?: Record<string, { steps: { node: string }[] }>;
+      defaultView?: { kind: string; id: string };
+    } | null;
+    expect("--from-journey ships only the journey's diagram",
+      Object.keys(dataJ?.diagrams ?? {}).length === 1 &&
+        "overview" in (dataJ?.diagrams ?? {}));
+    const overviewJ = dataJ?.diagrams?.["overview"];
+    expect("--from-journey narrows overview to the journey's 3 nodes",
+      overviewJ?.nodes.length === 3 &&
+        overviewJ.nodes.map((n) => n.id).sort().join(",") ===
+          "todo-api,todo-list-view,todo-store");
+    expect("--from-journey ships only the journey's edges (between its nodes)",
+      // overview has 5 edges; 3 connect journey nodes (e1, e2, e3), 2 are
+      // to nodes that got dropped (e4, e5).
+      overviewJ?.edges.length === 3 &&
+        overviewJ.edges.map((e) => e.id).sort().join(",") === "e1,e2,e3");
+    expect("--from-journey embeds the journey itself",
+      !!dataJ?.journeys && "complete-a-todo" in dataJ.journeys);
+    expect("--from-journey embeds only the named journey",
+      Object.keys(dataJ?.journeys ?? {}).length === 1);
+    expect("--from-journey embedded journey has 3 steps",
+      dataJ?.journeys?.["complete-a-todo"]?.steps.length === 3);
+    expect("--from-journey sets defaultView to the journey",
+      dataJ?.defaultView?.kind === "journey" &&
+        dataJ.defaultView.id === "complete-a-todo");
+    await unlink(outPath);
+
+    // ─── --from-journey + tag conflict prunes steps ─────────────────
+    // todo-list-view carries 'critical-path' → step 1 is pruned. Steps
+    // 2+3 survive (todo-api, todo-store).
+    execFileSync(
+      "pnpm",
+      ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+       "export-html", "--root", fixture, "--out", outPath,
+       "--from-journey", "complete-a-todo",
+       "--exclude-tag", "critical-path"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    const htmlJ2 = await readFile(outPath, "utf8");
+    const dataJ2 = extractLoomData(htmlJ2) as {
+      diagrams?: Record<string, { nodes: { id: string }[] }>;
+      journeys?: Record<string, { steps: { node: string }[] }>;
+    } | null;
+    expect("--from-journey + exclude-tag drops the conflicting node",
+      !dataJ2?.diagrams?.["overview"]?.nodes.some((n) => n.id === "todo-list-view"));
+    expect("--from-journey + exclude-tag prunes the conflicting step",
+      dataJ2?.journeys?.["complete-a-todo"]?.steps.length === 2 &&
+        !dataJ2.journeys["complete-a-todo"].steps.some(
+          (s) => s.node === "todo-list-view"
+        ));
+    await unlink(outPath);
+
+    // ─── --from-journey unknown id → fails ──────────────────────────
+    let unknownJourneyFailed = false;
+    try {
+      execFileSync(
+        "pnpm",
+        ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+         "export-html", "--root", fixture, "--out", outPath,
+         "--from-journey", "no-such-journey"],
+        { cwd: repoRoot, encoding: "utf8", stdio: "pipe" }
+      );
+    } catch {
+      unknownJourneyFailed = true;
+    }
+    expect("--from-journey on unknown id exits non-zero", unknownJourneyFailed);
+
     // ─── Named bundle from .loom/exports.json ───────────────────────
     // Write a temp config into the fixture; restore at the end.
     const exportsPath = resolve(fixture, ".loom/exports.json");
@@ -205,6 +289,41 @@ async function main() {
       expect("named bundle applies include-tags filter",
         overview6?.nodes.length === 1 &&
           overview6.nodes[0]?.id === "todo-list-view");
+      await unlink(outPath);
+
+      // ─── Named bundle with from-journey ───────────────────────────
+      await writeFile(
+        exportsPath,
+        JSON.stringify(
+          {
+            exports: {
+              "checkout-tour": {
+                "from-journey": "complete-a-todo",
+              },
+            },
+          },
+          null,
+          2
+        ) + "\n",
+        "utf8"
+      );
+      execFileSync(
+        "pnpm",
+        ["--filter", "loom-spec", "exec", "tsx", cliEntry,
+         "export-html", "checkout-tour", "--root", fixture, "--out", outPath],
+        { cwd: repoRoot, encoding: "utf8" }
+      );
+      const htmlB = await readFile(outPath, "utf8");
+      const dataB = extractLoomData(htmlB) as {
+        diagrams?: Record<string, { nodes: { id: string }[] }>;
+        journeys?: Record<string, unknown>;
+        defaultView?: { kind: string; id: string };
+      } | null;
+      expect("named bundle resolves from-journey",
+        Object.keys(dataB?.diagrams ?? {}).length === 1 &&
+          dataB?.diagrams?.["overview"]?.nodes.length === 3 &&
+          dataB?.defaultView?.kind === "journey" &&
+          dataB.defaultView.id === "complete-a-todo");
       await unlink(outPath);
 
       // Bundle not found

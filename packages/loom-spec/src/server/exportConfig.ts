@@ -32,6 +32,7 @@ export interface NamedExport {
   includeTags?: string[];
   excludeTags?: string[];
   diagram?: string;
+  fromJourney?: string;
   out?: string;
 }
 
@@ -43,6 +44,7 @@ interface RawNamedExport {
   "include-tags"?: unknown;
   "exclude-tags"?: unknown;
   diagram?: unknown;
+  "from-journey"?: unknown;
   out?: unknown;
 }
 
@@ -79,6 +81,7 @@ function normalize(raw: RawExportsFile): ExportsFile {
       includeTags: asStringArray(e["include-tags"], `${name}.include-tags`),
       excludeTags: asStringArray(e["exclude-tags"], `${name}.exclude-tags`),
       diagram: asString(e.diagram, `${name}.diagram`),
+      fromJourney: asString(e["from-journey"], `${name}.from-journey`),
       out: asString(e.out, `${name}.out`),
     };
   }

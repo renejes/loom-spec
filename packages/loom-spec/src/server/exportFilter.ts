@@ -28,14 +28,22 @@
 
 import type { LoomDiagram, Node as LoomNode } from "../types/diagram.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
+import type { LoomJourney } from "../types/journey.js";
 
 export interface FilterSpec {
   includeTags?: string[];
   excludeTags?: string[];
+  /** When set, restrict nodes in this journey's referenced diagram to those
+   *  the journey actually walks through. Other diagrams are unaffected by
+   *  this restriction (they survive on tag rules alone). The journey-aware
+   *  caller usually sets `--diagram` to the same diagram so the rest don't
+   *  ship at all. */
+  fromJourney?: { diagramId: string; nodeIds: Set<string> };
 }
 
 export interface LoomExportPayload {
   diagrams: Record<string, LoomDiagram>;
+  journeys?: Record<string, LoomJourney>;
   nodeTypes: LoomNodeTypes;
 }
 
@@ -47,10 +55,12 @@ export interface FilterResult {
     edgesDropped: number;
     groupsDropped: number;
     drillDownsCleared: number;
+    journeyStepsDropped: number;
+    journeysDropped: number;
   };
 }
 
-function nodeMatches(node: LoomNode, spec: FilterSpec): boolean {
+function nodeMatchesTags(node: LoomNode, spec: FilterSpec): boolean {
   const tags = node.tags ?? [];
   const includes = spec.includeTags ?? [];
   const excludes = spec.excludeTags ?? [];
@@ -63,6 +73,25 @@ function nodeMatches(node: LoomNode, spec: FilterSpec): boolean {
   return true;
 }
 
+function nodeMatches(
+  diagramId: string,
+  node: LoomNode,
+  spec: FilterSpec
+): boolean {
+  if (!nodeMatchesTags(node, spec)) return false;
+  // Journey scoping: only applies to the journey's own diagram. Nodes in
+  // other diagrams aren't affected by the journey filter (they're filtered
+  // by tags alone, or implicitly dropped if --diagram narrows the export).
+  if (
+    spec.fromJourney &&
+    spec.fromJourney.diagramId === diagramId &&
+    !spec.fromJourney.nodeIds.has(node.id)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Apply the filter cascade. Returns a deep-enough copy that mutating the
  * result doesn't mutate the input.
@@ -71,10 +100,19 @@ export function applyFilter(
   payload: LoomExportPayload,
   spec: FilterSpec
 ): FilterResult {
-  const noFilter =
+  const noNodeFilter =
     (spec.includeTags?.length ?? 0) === 0 &&
-    (spec.excludeTags?.length ?? 0) === 0;
-  if (noFilter) {
+    (spec.excludeTags?.length ?? 0) === 0 &&
+    !spec.fromJourney;
+
+  let nodesDropped = 0;
+  let edgesDropped = 0;
+  let groupsDropped = 0;
+  let drillDownsCleared = 0;
+  let journeyStepsDropped = 0;
+  let journeysDropped = 0;
+
+  if (noNodeFilter && !payload.journeys) {
     return {
       payload,
       summary: {
@@ -82,14 +120,11 @@ export function applyFilter(
         edgesDropped: 0,
         groupsDropped: 0,
         drillDownsCleared: 0,
+        journeyStepsDropped: 0,
+        journeysDropped: 0,
       },
     };
   }
-
-  let nodesDropped = 0;
-  let edgesDropped = 0;
-  let groupsDropped = 0;
-  let drillDownsCleared = 0;
 
   // First pass: filter each diagram's nodes / edges / groups.
   // Track surviving node ids per diagram so we can decide which drill_down
@@ -102,7 +137,9 @@ export function applyFilter(
     const beforeEdges = d.edges.length;
     const beforeGroups = d.groups?.length ?? 0;
 
-    const survivingNodes = d.nodes.filter((n) => nodeMatches(n, spec));
+    const survivingNodes = noNodeFilter
+      ? d.nodes
+      : d.nodes.filter((n) => nodeMatches(id, n, spec));
     const survivingIds = new Set(survivingNodes.map((n) => n.id));
     survivingNodeIdsByDiagram[id] = survivingIds;
 
@@ -158,9 +195,34 @@ export function applyFilter(
     }
   }
 
+  // Third pass: cascade into journeys. Prune steps whose node was dropped;
+  // drop journeys whose diagram is empty or whose steps are all gone.
+  const filteredJourneys: Record<string, LoomJourney> | undefined =
+    payload.journeys ? {} : undefined;
+  if (payload.journeys && filteredJourneys) {
+    for (const [jid, j] of Object.entries(payload.journeys)) {
+      const survivors = survivingNodeIdsByDiagram[j.diagram];
+      // Diagram filtered out entirely (or wasn't in the export at all) →
+      // drop the journey. Without nodes there's nothing to walk through.
+      if (!survivors || survivors.size === 0) {
+        journeysDropped++;
+        continue;
+      }
+      const beforeSteps = j.steps.length;
+      const survivingSteps = j.steps.filter((s) => survivors.has(s.node));
+      journeyStepsDropped += beforeSteps - survivingSteps.length;
+      if (survivingSteps.length === 0) {
+        journeysDropped++;
+        continue;
+      }
+      filteredJourneys[jid] = { ...j, steps: survivingSteps };
+    }
+  }
+
   return {
     payload: {
       diagrams: filteredDiagrams,
+      journeys: filteredJourneys,
       nodeTypes: payload.nodeTypes,
     },
     summary: {
@@ -168,6 +230,8 @@ export function applyFilter(
       edgesDropped,
       groupsDropped,
       drillDownsCleared,
+      journeyStepsDropped,
+      journeysDropped,
     },
   };
 }

@@ -36,6 +36,7 @@ Usage:
       it into Claude Code's mcp.json (or any MCP-capable client).
 
   loom-spec export-html [<bundle-name>] [--out <path>] [--diagram <id>]
+                        [--from-journey <id>]
                         [--include-tag <comma-list>] [--exclude-tag <comma-list>]
                         [--root <dir>]
       Build a standalone interactive HTML file from the spec — pan/zoom,
@@ -44,7 +45,10 @@ Usage:
       Output defaults to ./loom.html. With --diagram, only that diagram
       ships. With --include-tag / --exclude-tag, only nodes whose 'tags'
       match survive — edges, groups, and drill-down chevrons that point
-      at dropped nodes are cleaned up automatically.
+      at dropped nodes are cleaned up automatically. With --from-journey,
+      the export scopes to the named journey: only its diagram, only its
+      nodes, and the journey itself ships embedded; the HTML opens at
+      #journey:<id> by default — handy for tour/walkthrough docs.
 
       Pass a <bundle-name> as the first positional arg to read settings
       from a named bundle in .loom/exports.json. Explicit flags override
@@ -137,6 +141,10 @@ async function main() {
       out: (flags.out as string) ?? EXPORT_DEFAULT_OUT,
       root: (flags.root as string) ?? process.cwd(),
       diagram: typeof flags.diagram === "string" ? flags.diagram : undefined,
+      fromJourney:
+        typeof flags["from-journey"] === "string"
+          ? flags["from-journey"]
+          : undefined,
       includeTags: splitTags(flags["include-tag"]),
       excludeTags: splitTags(flags["exclude-tag"]),
       bundle,
