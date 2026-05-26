@@ -40,6 +40,12 @@ export interface NodeCardData extends Record<string, unknown> {
   /** True while this node is the focal "active" one in a read-only embed
    *  (e.g. the current Journey step). Drives the node-color glow. */
   active?: boolean;
+  /** True for Journey steps that have already been visited (i.e. step
+   *  index < currentStepIndex). Subtle non-focal highlight. */
+  visited?: boolean;
+  /** True when the node is outside the focal subset (e.g. not referenced
+   *  by the current journey at all). Renders with reduced opacity. */
+  dimmed?: boolean;
 }
 
 /**
@@ -55,7 +61,7 @@ function handleTopPercent(index: number, total: number): string {
 }
 
 export function NodeCard({ data }: NodeProps) {
-  const { node, typeDef, onDrillDown, active } = data as NodeCardData;
+  const { node, typeDef, onDrillDown, active, visited, dimmed } = data as NodeCardData;
   const color = typeDef?.color ?? "#71717a";
   const Icon = typeDef?.icon ? (ICONS[typeDef.icon] ?? Box) : Box;
   const typeLabel = typeDef?.label ?? node.type;
@@ -67,7 +73,7 @@ export function NodeCard({ data }: NodeProps) {
 
   return (
     <div
-      className={`node-card status-${node.status}${hasInPorts || hasOutPorts ? " has-ports" : ""}${active ? " active" : ""}`}
+      className={`node-card status-${node.status}${hasInPorts || hasOutPorts ? " has-ports" : ""}${active ? " active" : ""}${visited ? " visited" : ""}${dimmed ? " dimmed" : ""}`}
       style={{
         ["--node-color" as string]: color,
         ["--status-color" as string]: STATUS_COLOR[node.status],

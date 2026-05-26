@@ -3,24 +3,27 @@ import { useTheme } from "../theme";
 import type { SaveStatus, ConnectionStatus } from "../state";
 import { DiagramSwitcher } from "./DiagramSwitcher";
 import type { DiagramSummary } from "../loadDiagram";
-import type { ViewState } from "../useViewState";
+import type { JourneySummary } from "../loadJourney";
+import type { ViewState, ViewKind } from "../useViewState";
 
 interface Props {
+  viewKind?: ViewKind;
   viewId: string;
   title: string;
   subtitle?: string;
   diagrams: DiagramSummary[];
+  journeys?: JourneySummary[];
   saveStatus: SaveStatus;
   saveError: string | null;
   connectionStatus: ConnectionStatus;
   validationErrorCount?: number;
-  onClickAdd: () => void;
-  addMenuOpen: boolean;
+  onClickAdd?: () => void;
+  addMenuOpen?: boolean;
   isDefault: boolean;
   onClickHome: () => void;
   onNavigate: (view: ViewState) => void;
   onCreateDiagram?: () => void;
-  addButtonRef: React.RefObject<HTMLButtonElement> | null;
+  addButtonRef?: React.RefObject<HTMLButtonElement> | null;
   hideAddButton?: boolean;
 }
 
@@ -94,16 +97,18 @@ function SaveIndicator({
 }
 
 export function TopBar({
+  viewKind = "diagram",
   viewId,
   title,
   subtitle,
   diagrams,
+  journeys,
   saveStatus,
   saveError,
   connectionStatus,
   validationErrorCount = 0,
   onClickAdd,
-  addMenuOpen,
+  addMenuOpen = false,
   isDefault,
   onClickHome,
   onNavigate,
@@ -125,9 +130,11 @@ export function TopBar({
         </button>
       )}
       <DiagramSwitcher
+        currentKind={viewKind}
         currentId={viewId}
         currentTitle={title}
         diagrams={diagrams}
+        journeys={journeys}
         onNavigate={onNavigate}
         onCreate={onCreateDiagram}
       />
@@ -142,7 +149,7 @@ export function TopBar({
       )}
       <ConnectionDot status={connectionStatus} />
       <SaveIndicator status={saveStatus} error={saveError} />
-      {!hideAddButton && addButtonRef && (
+      {!hideAddButton && addButtonRef && onClickAdd && (
         <button
           ref={addButtonRef}
           onClick={onClickAdd}

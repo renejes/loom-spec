@@ -531,6 +531,26 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
     var(--shadow);
   transition: box-shadow 0.08s ease-out;
 }
+.node-card.visited {
+  /* Subtle ring on previously-visited Journey steps. Keeps the path
+     visible without competing with the active glow. */
+  box-shadow:
+    0 0 0 1.5px color-mix(in oklab, var(--node-color) 45%, transparent),
+    var(--shadow);
+  opacity: 0.85;
+}
+.node-card.dimmed {
+  /* Nodes outside the focal subset (e.g. not in the current journey).
+     Strong enough fade to push them visually behind, but they stay
+     readable so context isn't lost. */
+  opacity: 0.28;
+  filter: saturate(0.6);
+  transition: opacity 0.12s ease-out, filter 0.12s ease-out;
+}
+.node-card.dimmed:hover {
+  opacity: 0.85;
+  filter: none;
+}
 
 .node-card .node-header {
   display: flex;
@@ -723,4 +743,199 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 }
 .react-flow__edge-textbg {
   fill: var(--bg-elevated);
+}
+
+/* ─── Journey view ────────────────────────────────────────────── */
+.journey-view {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 1fr 340px;
+  grid-template-areas:
+    "topbar topbar"
+    "stepbar stepbar"
+    "canvas sidebar";
+  height: 100vh;
+}
+.journey-view.sidebar-closed {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "topbar"
+    "stepbar"
+    "canvas";
+}
+.journey-view .topbar { grid-area: topbar; }
+.journey-view .canvas-wrap { grid-area: canvas; }
+
+.step-bar {
+  grid-area: stepbar;
+  height: 44px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+}
+.step-bar .step-nav {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 4px 10px;
+}
+.step-bar .step-nav:hover:not(:disabled) {
+  background: var(--bg-canvas);
+  border-color: var(--border-strong);
+}
+.step-bar .step-nav:disabled {
+  color: var(--text-subtle);
+  border-color: var(--border);
+  background: transparent;
+  cursor: default;
+  opacity: 0.6;
+}
+.step-counter {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 100px;
+  text-align: center;
+}
+.step-counter strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.step-counter .step-empty {
+  font-style: italic;
+}
+.step-title {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.step-sidebar-toggle {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 4px;
+}
+.step-sidebar-toggle:hover {
+  background: var(--bg-canvas);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.step-sidebar {
+  grid-area: sidebar;
+  border-left: 1px solid var(--border);
+  background: var(--bg-elevated);
+  overflow-y: auto;
+  padding: 12px 14px 16px;
+}
+.step-sidebar-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.step-list-item {
+  margin: 0;
+  padding: 0;
+}
+.step-list-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+.step-list-button:hover {
+  background: var(--bg-hover);
+}
+.step-list-item.current .step-list-button {
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.step-list-item.visited .step-list-button {
+  opacity: 0.7;
+}
+.step-list-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-list-item.current .step-list-num {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.step-list-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.step-list-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.step-list-title code {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.step-list-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.step-list-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+.step-list-refs code {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  word-break: break-all;
 }

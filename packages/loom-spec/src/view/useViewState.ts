@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type ViewKind = "diagram";
+export type ViewKind = "diagram" | "journey";
 
 export interface ViewState {
   kind: ViewKind;
@@ -18,11 +18,17 @@ function readHash(): ViewState {
     const id = raw.slice("diagram:".length).trim();
     return id ? { kind: "diagram", id } : DEFAULT_VIEW;
   }
+  if (raw.startsWith("journey:")) {
+    const id = raw.slice("journey:".length).trim();
+    if (id) return { kind: "journey", id };
+    return DEFAULT_VIEW;
+  }
   // Backwards-compatible: bare id → diagram
   return { kind: "diagram", id: raw };
 }
 
 function viewToHash(v: ViewState): string {
+  if (v.kind === "journey") return `#journey:${v.id}`;
   if (v.id === DEFAULT_DIAGRAM_ID) return "";
   return `#diagram:${v.id}`;
 }
@@ -52,7 +58,7 @@ export function useViewState(): {
     setView(next);
   }, []);
 
-  const isDefault = view.id === DEFAULT_DIAGRAM_ID;
+  const isDefault = view.kind === "diagram" && view.id === DEFAULT_DIAGRAM_ID;
 
   return { view, navigate, isDefault };
 }

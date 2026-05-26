@@ -14,12 +14,16 @@
  */
 import type { LoomDiagram } from "../types/diagram";
 import type { LoomNodeTypes } from "../types/node-types";
+import type { LoomJourney } from "../types/journey";
 
 export interface ExportData {
   /** ISO timestamp when the export was generated. */
   generatedAt: string;
   /** Map of diagram id → full diagram doc. */
   diagrams: Record<string, LoomDiagram>;
+  /** Map of journey id → full journey doc. Optional — exports without
+   *  any journeys omit this field. Filled in by the HTML exporter. */
+  journeys?: Record<string, LoomJourney>;
   nodeTypes: LoomNodeTypes;
 }
 

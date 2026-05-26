@@ -50,6 +50,12 @@ interface Props {
    *  embedded mini-graph in non-interactive views (e.g. Journey step
    *  highlight). Empty/undefined → no glow. */
   activeNodeIds?: ReadonlySet<string>;
+  /** Ids of nodes that should render with the "visited" subtle highlight
+   *  (Journey steps before the current one). */
+  visitedNodeIds?: ReadonlySet<string>;
+  /** Ids of nodes that should render dimmed — outside the focal subset
+   *  (e.g. nodes not referenced by any journey step). */
+  dimmedNodeIds?: ReadonlySet<string>;
   /** Ids of edges that should render with a traveling pulse marker.
    *  Same use-case as `activeNodeIds`. */
   pulsingEdgeIds?: ReadonlySet<string>;
@@ -78,6 +84,8 @@ export function DiagramCanvas({
   onDrillDown,
   interactive = true,
   activeNodeIds,
+  visitedNodeIds,
+  dimmedNodeIds,
   pulsingEdgeIds,
 }: Props) {
   const flowNodes: FlowNode<NodeCardData | GroupNodeData>[] = useMemo(() => {
@@ -116,11 +124,22 @@ export function DiagramCanvas({
         typeDef: nodeTypesConfig.types[n.type],
         onDrillDown,
         active: activeNodeIds?.has(n.id) ?? false,
+        visited: visitedNodeIds?.has(n.id) ?? false,
+        dimmed: dimmedNodeIds?.has(n.id) ?? false,
       },
     }));
 
     return [...groupNodes, ...itemNodes];
-  }, [diagram, nodeTypesConfig, selection, onDrillDown, interactive, activeNodeIds]);
+  }, [
+    diagram,
+    nodeTypesConfig,
+    selection,
+    onDrillDown,
+    interactive,
+    activeNodeIds,
+    visitedNodeIds,
+    dimmedNodeIds,
+  ]);
 
   const flowEdges: FlowEdge[] = useMemo(() => {
     // Group edges by source→target so parallels share an offset axis.
