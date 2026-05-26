@@ -212,6 +212,10 @@ Journeys participate in `loom-spec validate` just like nodes do:
 
 - Step `code_refs[]` are walked for missing files / symbols /
   out-of-range line refs.
+- Step `code_refs[].signature_hint` (filled by
+  `loom-spec validate --capture`) is compared against the current
+  source signature; drift = warning. Supported languages: Python,
+  TypeScript/JSX, Rust, Svelte.
 - Referential integrity is re-checked: every `step.node` must still
   resolve to a node in the journey's diagram.
 

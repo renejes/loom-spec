@@ -17,9 +17,11 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.7.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
+**v0.8.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
 
-v0.7.0 is a **quality-of-life round** ([Phase 6](./done/phase-6-quality-of-life.md)) driven by real-world feedback from a separate session using v0.6.0 on a real project. Auto-layout finds a non-overlapping spot for new nodes (no more guessing `{x, y}`). Edges get a free-form `properties` field for project-specific architectural attributes (sync/async, retry policy, etc.). A new `loom_update_edge` MCP tool rounds out the diagram CRUD. SKILL.md gets a Granularity-patterns section that documents the "how many nodes per file" question that bites every new project. The `.loom/README.md` template is rewritten for cold-reader onboarding. A signature-fingerprint drift check was punted to backlog #21 — the honest implementation needs language-aware AST parsing.
+v0.8.0 adds **signature-drift detection** ([Phase 7](./done/phase-7-signature-drift.md)) — closes the gap that motivated the feature in the first place: a code_ref's symbol can still exist while its actual contract changed materially. `code_refs[].signature_hint` captures the canonical declaration line (`def parse_pdf(file_path: str) -> dict:`); on subsequent `loom-spec validate`, the current source is re-extracted and compared. Mismatch = warning that an agent or human sees. Coverage: Python, TypeScript/JSX, Rust, Svelte (the author's active stack). Other languages skip silently. `--capture` and `--recapture` flags manage the baseline. Validate also now walks journey step refs (which the v0.6.0 docs claimed but didn't actually do).
+
+v0.7.0 was a **quality-of-life round** ([Phase 6](./done/phase-6-quality-of-life.md)) driven by real-world feedback. Auto-layout finds a non-overlapping spot for new nodes (no more guessing `{x, y}`). Edges get a free-form `properties` field for project-specific architectural attributes (sync/async, retry policy, etc.). A new `loom_update_edge` MCP tool rounds out the diagram CRUD. SKILL.md gets a Granularity-patterns section. The `.loom/README.md` template is rewritten for cold-reader onboarding.
 
 v0.6.0 added **Journeys** — a new file kind for ordered, untimed walkthroughs of the architecture. Pick a journey from the switcher and the viewer narrows to its steps: current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity. Same source compiles into an HTML export via `--from-journey <id>` that opens directly at the walkthrough. The 8 MCP tools (`loom_create_journey`, `loom_add_step`, etc.) make it the natural AI-author surface; the in-browser editor for journeys is deliberately deferred until a concrete pain point shows up.
 
@@ -33,19 +35,20 @@ For per-version detail of what shipped when, see [`done/`](./done/):
 - [Phase 4 — Timeline removal](./done/phase-4-timeline-removal.md) (v0.5.0)
 - [Phase 5 — Journeys](./done/phase-5-journeys.md) (v0.6.0)
 - [Phase 6 — Quality-of-life round](./done/phase-6-quality-of-life.md) (v0.7.0)
+- [Phase 7 — Signature-drift detection](./done/phase-7-signature-drift.md) (v0.8.0)
 
 ## Capabilities at a glance
 
-| Layer | What works as of v0.7.0 |
+| Layer | What works as of v0.8.0 |
 |---|---|
-| Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. Edges carry an optional free-form `properties` object for project-specific attributes (sync/async, retry, timeout, etc.). |
-| CLI | `init [--mcp]`, `install-mcp`, `view`, `validate`, `mcp`, `export-html` (with `--from-journey`). |
-| MCP server | 19 tools — 11 for diagrams (list/read/add-node/update-node/mark-stale/delete-node/add-edge/update-edge/delete-edge/validate/read-node-types) + 8 for journeys (list/read/create/add-step/update-step/delete-step/reorder-steps/delete). All mutations schema-validated and (for journeys) cross-checked against the referenced diagram before write. `loom_add_node` auto-places the new node when no position is provided. |
+| Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. Edges carry an optional free-form `properties` object. Code-refs carry an optional `signature_hint` (filled by `validate --capture`) for drift detection. |
+| CLI | `init [--mcp]`, `install-mcp`, `view`, `validate [--capture | --recapture]`, `mcp`, `export-html` (with `--from-journey`). |
+| MCP server | 19 tools — 11 for diagrams + 8 for journeys. All mutations schema-validated and (for journeys) cross-checked against the referenced diagram before write. `loom_add_node` auto-places when no position is provided. `loom_validate` accepts `capture: "capture" | "recapture" | "none"` to manage signature_hint baselines. |
 | Browser editor | xyflow-based diagram canvas with light/dark theme, drag, debounced auto-save, code-refs editing, tags chips, ports, inline validation, drill-down between diagrams, group frames, parallel-edge offsets. +Add auto-places the new node next to existing ones. Switcher includes a Journeys section. |
 | Journey viewer | Read-only step navigator (prev/next, keyboard ←/→/Home/End), current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity, edge between consecutive steps pulses, collapsible step sidebar with code-refs. |
 | Live sync | chokidar watcher with self-write suppression; SSE for both diagram and journey changes; UI refetches on external edits. |
 | Agent skill | `.claude/skills/loom-spec/SKILL.md` with 7 worked examples (incl. journey authoring) + tagging hygiene + workflow-vs-tags decision rule + granularity patterns ("how many nodes per file") + security warnings. |
-| Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Exits non-zero for CI / pre-commit. |
+| Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Two checks: existence (file + symbol + line range) and signature drift (canonical declaration line, language-aware for Python/TS/JSX/Rust/Svelte). Exits non-zero on schema errors, broken refs, and signature drift; `signature-missing` is informational. |
 | Export | Standalone interactive HTML; tag-based filter with cascade rules (drop edges to dropped nodes, shrink groups, clear drill-downs); named bundles via `.loom/exports.json`; `--diagram <id>` for single-diagram exports; `--include-tag` / `--exclude-tag`; `--from-journey <id>` for focused walkthrough exports with `defaultView` hint. |
 
 ## Architecture
@@ -162,9 +165,10 @@ End-to-end checks that currently pass (via `pnpm --filter loom-spec typecheck` p
 - TypeScript types autogenerate and the entire codebase typechecks cleanly.
 - **Export-html smoke** (`scripts/smoke-export-html.ts`, 35 assertions) — full export / `--diagram` / `--include-tag` cascade / `--exclude-tag` / `--from-journey` (single-diagram narrowing, journey embedding, defaultView, step pruning under tag conflict) / named bundles for both tag and journey scopes / unknown-bundle and unknown-journey errors.
 - **MCP-journeys smoke** (`scripts/smoke-mcp-journeys.ts`, 29 assertions) — spawns `loom-spec mcp` against a tmpfs copy of the fixture and exercises all 8 journey tools over stdio, with at least one negative path per tool. Byte-for-byte cleanup leaves the original fixture untouched.
-- **MCP-diagrams smoke** (`scripts/smoke-mcp-diagrams.ts`, 13 assertions) — covers the v0.7.0 additions: auto-layout placement (no overlap, to-the-right-of-rightmost), edge `properties` round-trip, `loom_update_edge` patch semantics and missing-id error.
+- **MCP-diagrams smoke** (`scripts/smoke-mcp-diagrams.ts`, 13 assertions) — covers the v0.7.0 additions: auto-layout placement, edge `properties` round-trip, `loom_update_edge` patch semantics.
+- **Signatures smoke** (`scripts/smoke-signatures.ts`, 30 assertions) — 16 extractor unit checks (Python/TS/Rust/Svelte canonical shapes incl. generics, lifetimes, async, modifiers, multi-line) + 14 end-to-end (write source in 4 languages, capture hints, mutate a signature, detect drift, recapture acknowledges new baseline).
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite. Plus `dist/view-export/` (single chunk) for the standalone HTML embed.
-- npm-installed flow via the published `loom-spec@0.7.0`.
+- npm-installed flow via the published `loom-spec@0.8.0`.
 - Real-world use: the author's day-to-day project uses the diagram editor + MCP tools + drift validation + HTML export.
 
 ## What is not yet verified

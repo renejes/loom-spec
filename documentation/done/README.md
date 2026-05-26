@@ -13,6 +13,7 @@ material; everything that's complete lives here.
 | [Phase 4](./phase-4-timeline-removal.md) | **Deliberate scope-down**: timeline view, OTel trace importer, and 5 timeline MCP tools removed because the only confirmed user didn't use them. PulseEdge + mini-graph plumbing kept for Journey repurposing. | v0.5.0 |
 | [Phase 5](./phase-5-journeys.md) | Journeys — new file kind for ordered, untimed walkthroughs. Schema + 8 MCP tools + read-only viewer (current step glows, prior steps highlighted, non-journey nodes dimmed) + `--from-journey` HTML export with `defaultView` hint. Editor UI deferred until concrete pain shows up. | v0.6.0 |
 | [Phase 6](./phase-6-quality-of-life.md) | Quality-of-life round driven by real-world feedback: auto-layout for new nodes (no more guessing coordinates), free-form `properties` on edges, new `loom_update_edge` MCP tool, Granularity patterns in SKILL.md, rewritten `.loom/README.md` template. Signature-fingerprint drift check punted to backlog #21. | v0.7.0 |
+| [Phase 7](./phase-7-signature-drift.md) | Signature-drift detection. `code_refs[].signature_hint` captures the canonical declaration line; `loom-spec validate` flags drift. Language coverage: Python, TypeScript (incl. JSX/JS), Rust, Svelte. `--capture` / `--recapture` workflow for managing the baseline. Validate also now walks journey step refs (which the docs claimed but didn't actually do). | v0.8.0 |
 
 For the open backlog see [`../next-steps.md`](../next-steps.md). For
 the current state of the codebase see

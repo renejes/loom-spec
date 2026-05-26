@@ -22,11 +22,18 @@ Usage:
       Start the local browser editor. Walks up from --root (default: cwd)
       to find the nearest .loom/ directory.
 
-  loom-spec validate [--root <dir>] [--json]
-      Check every diagram for schema validity and code-ref drift
-      (missing files, missing symbols, out-of-range line refs).
-      Exits non-zero if any issue is found. Use as a CI step or
-      pre-commit hook.
+  loom-spec validate [--root <dir>] [--json] [--capture | --recapture]
+      Check every diagram and journey for schema validity and code-ref
+      drift (missing files, missing symbols, out-of-range line refs,
+      signature drift). Exits non-zero on schema errors, broken refs,
+      or signature drift. Use as a CI step or pre-commit hook.
+
+      With --capture, fills missing signature_hint fields on code_refs
+      from current source (writes back to JSON). Run once after adding
+      new nodes/steps so future drift is detectable.
+
+      With --recapture, overwrites all signature_hints with current
+      source — acknowledges all refactors so far as the new baseline.
 
   loom-spec mcp [--root <dir>]
       Start a Model Context Protocol server on stdio. Exposes 18 tools
@@ -115,9 +122,15 @@ async function main() {
   }
 
   if (subcommand === "validate") {
+    const capture = flags.recapture
+      ? ("recapture" as const)
+      : flags.capture
+        ? ("capture" as const)
+        : ("none" as const);
     await runValidate({
       root: (flags.root as string) ?? process.cwd(),
       json: Boolean(flags.json),
+      capture,
     });
     return;
   }

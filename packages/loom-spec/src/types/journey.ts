@@ -57,4 +57,8 @@ export interface CodeRef {
    * Line range(s) like '1-80' or '12,45-50'. Use only when no symbol applies.
    */
   lines?: string;
+  /**
+   * Canonical signature line captured from the symbol's source. Filled by `loom-spec validate --capture`. Drift detection compares this against the current source; mismatch = warning.
+   */
+  signature_hint?: string;
 }

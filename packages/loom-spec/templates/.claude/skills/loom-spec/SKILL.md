@@ -47,6 +47,41 @@ For any task that touches structure:
 - If you touch a file referenced by a node, verify the `symbol` still exists
   and the `path` is still accurate. Update if not.
 - If you rename or move a file, update every `code_refs` pointing at it.
+- If you change a function's **signature** materially (parameter types,
+  return type, async-ness), the existence check passes but the spec is
+  semantically stale. Run `loom_validate` — signature-drift findings
+  will flag this. Either update the node's `description` to reflect the
+  new contract and run `loom_validate({ capture: "recapture" })`, or
+  revert the code change. Don't silently re-capture without updating
+  the surrounding spec.
+
+### Signature drift workflow
+
+`loom-spec validate` captures a `signature_hint` on each code_ref the
+first time it sees one with a parsable file (.py, .ts/.tsx/.js, .rs,
+.svelte). On subsequent runs, it compares the stored hint against the
+current source; mismatch = warning.
+
+The lifecycle:
+
+1. **After adding a node with code_refs** — run
+   `loom_validate({ capture: "capture" })` (or
+   `loom-spec validate --capture` from a shell). Fills the hint so
+   future drift is detectable.
+2. **As you work** — `loom_validate({})` is read-only and reports
+   drift. Run it before declaring "feature done".
+3. **When drift is real and intentional** — update the node's
+   description / properties to match the new code, then
+   `loom_validate({ capture: "recapture" })` writes the new hint as
+   the acknowledged baseline.
+4. **In CI** — `loom-spec validate` (no flags) exits non-zero on
+   schema errors, broken refs, and signature drift. signature-missing
+   findings are informational and don't fail CI (use a `--capture`
+   step in the spec-author commit, not in CI).
+
+The check is only as good as the language parsers. Python, TypeScript
+(incl. JSX), Rust, and Svelte are supported as of v0.8.0. Other
+extensions skip the check silently — the existence check still runs.
 
 ### When deleting code
 
@@ -188,7 +223,9 @@ If a `loom-spec` MCP server is registered with the host (e.g. via
 - `loom_list_diagrams`, `loom_read_diagram`, `loom_read_node_types`
 - `loom_add_node`, `loom_update_node`, `loom_mark_stale`, `loom_delete_node`
 - `loom_add_edge`, `loom_delete_edge`
-- `loom_validate` (schema + code-ref drift across every diagram)
+- `loom_validate` (schema + code-ref drift across every diagram + journey;
+  pass `{ capture: "capture" }` or `{ capture: "recapture" }` to manage
+  signature_hint baselines)
 - `loom_list_journeys`, `loom_read_journey`
 - `loom_create_journey`, `loom_add_step`, `loom_update_step`,
   `loom_delete_step`, `loom_reorder_steps`, `loom_delete_journey`

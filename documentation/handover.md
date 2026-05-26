@@ -1,4 +1,4 @@
-# Handover prompt — continue after v0.7.0 release
+# Handover prompt — continue after v0.8.0 release
 
 Copy everything in the fenced block below into a fresh Claude Code chat in the project root. It briefs the assistant on context, current state, conventions, and what's next.
 
@@ -7,9 +7,11 @@ Copy everything in the fenced block below into a fresh Claude Code chat in the p
 ````
 I'm continuing work on `loom-spec`, an open-source spec-as-code tool
 that keeps a node-based architecture spec inside the repo. You're
-picking up after v0.7.0 shipped — a quality-of-life round on top of
-v0.6.0's Journeys feature. Read the briefing below, then read five
-docs in order, then propose what to do next.
+picking up after v0.8.0 shipped — signature-drift detection in
+Python/TS/Rust/Svelte, the feature that closes the gap between "the
+symbol still exists" and "the symbol still does what the spec
+claims". Read the briefing below, then read five docs in order, then
+propose what to do next.
 
 ## What loom-spec is (30 seconds)
 
@@ -35,12 +37,36 @@ docs sites with tag-based filtering for public vs internal, and
 `--from-journey` for focused walkthrough exports that open at the
 journey by default.
 
-## What v0.7.0 changed (critical context)
+## What v0.8.0 changed (critical context)
+
+v0.8.0 added Phase 7 — signature-drift detection across the four
+languages the author actively uses (Python, TS/JSX, Rust, Svelte).
+Closes the gap that the existence check left open: if a function's
+contract changes but the symbol name stays the same, the spec is
+silently stale. Now `loom-spec validate` catches it.
+
+Mechanics:
+- `code_refs[].signature_hint` (optional string) captures the
+  canonical declaration line: `def parse_pdf(file_path: str) -> dict:`.
+- `loom-spec validate --capture` fills missing hints. `--recapture`
+  overwrites all hints (acknowledge current state as new baseline).
+- Default `validate` is read-only and exits non-zero on drift.
+- `loom_validate` MCP tool accepts `capture: "capture" | "recapture" | "none"`.
+- Validate also now walks journey step refs (the v0.6.0 docs claimed
+  this but it was a lie — fixed in v0.8.0).
+- Other languages (Go, Java, etc.) skip the signature check
+  silently; backlog #25 documents the path for adding more.
+
+Implementation: regex+state-machine extractors per language, no
+tree-sitter dep. Trade-off discussed in the Phase 7 archive — the
+short version is "agents review warnings with more context than any
+heuristic provides; false-positive bias beats silent breakage."
+
+## What v0.7.0 changed (critical context — still relevant)
 
 v0.7.0 was a small quality-of-life round triggered by real-world
-feedback from another Claude Code session using v0.6.0 on a real
-project. Four concrete pain points; this release fixed three and
-punted the fourth:
+feedback. Four concrete pain points; that release fixed three and
+punted the fourth (which became Phase 7):
 
 - **Auto-layout for new nodes** (`src/layout.ts`). `loom_add_node`
   without a position now picks a non-overlapping spot to the right
@@ -59,10 +85,11 @@ punted the fourth:
 - **`.loom/README.md` template rewrite** for cold-reader
   onboarding.
 
-Punted to backlog #21: signature-fingerprint drift check. The
-honest implementation needs language-aware AST parsing, which is
-multi-week per language. See `done/phase-6-quality-of-life.md`
-for the reasoning.
+**Note**: backlog #21 (signature-fingerprint) was the one we deferred
+from Phase 6; it then shipped in Phase 7 because the author's stated
+goal — "spec stays up-to-date, agent can't miss staleness" — made it
+the highest-leverage thing to build next. Pragmatic regex approach
+landed in ~10 h, not the multi-week project I originally feared.
 
 ## What v0.6.0 changed (critical context — still relevant)
 
@@ -96,11 +123,11 @@ Deliberate non-additions in this phase:
 
 ## Where it stands right now
 
-- **`loom-spec@0.7.0`** is the latest on npm.
+- **`loom-spec@0.8.0`** is the latest on npm.
 - Real-world adoption confirmed (the author uses it on a separate
-  project; reports the diagram editor + MCP tools + drift + export
-  work as expected. Journey use is light so far; the v0.7.0 round
-  came from concrete pain in the real-world project).
+  project; the diagram editor + MCP tools + drift detection + export
+  + signature-fingerprint workflow all see real use. Journey use is
+  light so far).
 - Repo: https://github.com/renejes/loom-spec
 - Working directory: `/Users/renejesser/Desktop/Programming - Projekte/graphical-programming`
 - pnpm workspace; the package lives in `packages/loom-spec/`.
@@ -126,9 +153,10 @@ based on real pain, or wait for it. Top candidates:
 1. `documentation/project-status.md` — current state, what works,
    how it's wired together. **Most important read.**
 2. `documentation/next-steps.md` — open backlog with priorities.
-3. `documentation/done/phase-6-quality-of-life.md` — the most
-   recent shipped work. Why the four QoL fixes, why we punted
-   signature-fingerprint, where the test coverage gap was.
+3. `documentation/done/phase-7-signature-drift.md` — the most
+   recent shipped work. What got built, why regex over tree-sitter,
+   what's deliberately not in scope (auto-capture on MCP write,
+   other languages).
 4. `documentation/journeys.md` — user-facing feature doc for the
    v0.6.0 Journeys addition. Understand what Journeys are and aren't.
 5. `documentation/done/phase-4-timeline-removal.md` — the v0.5.0
@@ -204,8 +232,10 @@ based on real pain, or wait for it. Top candidates:
     spawns the MCP server and exercises all 8 journey tools)
   - `packages/loom-spec/scripts/smoke-mcp-diagrams.ts` (13 assertions,
     covers auto-layout + edge properties + `loom_update_edge`)
-  All three clean up byte-for-byte. Run them after changes that touch
-  the export pipeline or the MCP server.
+  - `packages/loom-spec/scripts/smoke-signatures.ts` (30 assertions,
+    extractor units + e2e capture/drift/recapture across 4 languages)
+  All four clean up byte-for-byte. Run them after changes that touch
+  the export pipeline, the MCP server, or the signatures module.
 - npm publishing: account has `auth-and-writes` 2FA. The reliable
   flow is `npm logout && npm login` (browser passkey) then
   `npm publish` (interactive OTP). If the token in `~/.npmrc` ever
@@ -222,11 +252,12 @@ based on real pain, or wait for it. Top candidates:
    to over-build.
 
 Tone: opinionated, honest about trade-offs, push back when I'm
-wrong. v0.5.0 (timeline removal), v0.6.0's Phase 5 (read-only-first
-journeys, no editor UI), and v0.7.0's Phase 6 (defer
-signature-fingerprint behind a real-pain trigger) are three proof
-points this project will cut or postpone features that aren't
-earning their keep. Apply the same scrutiny going forward.
+wrong. The project has a track record of cutting/postponing
+features that don't earn their keep: v0.5.0 removed the timeline
+view entirely; v0.6.0's Phase 5 shipped journeys as read-only-first
+(no editor UI); v0.7.0's Phase 6 deferred signature-fingerprint
+behind real pain (which then triggered in Phase 7's v0.8.0). Apply
+the same scrutiny going forward.
 
 Working directory is
 `/Users/renejesser/Desktop/Programming - Projekte/graphical-programming`.

@@ -668,11 +668,20 @@ export function createMcpServer(loomRoot: LoomRoot) {
     {
       title: "Validate spec",
       description:
-        "Run the full drift + schema check on every diagram. Reports schema errors, missing code-ref files, and missing symbols.",
-      inputSchema: {},
+        "Run the full drift + schema check on every diagram AND journey. Reports schema errors, missing code-ref files, missing symbols, line-range issues, and signature drift (captured signature_hint vs. current source). Pass capture='capture' to fill missing hints, or 'recapture' to overwrite all hints from current source (writes back to JSON). signature-missing findings are informational (no exit-code impact); signature-drift is reported alongside other broken-ref findings.",
+      inputSchema: {
+        capture: z
+          .enum(["none", "capture", "recapture"])
+          .optional()
+          .describe(
+            "Default 'none' = read-only. 'capture' fills missing signature_hints. 'recapture' overwrites all hints with current source."
+          ),
+      },
     },
-    async () => {
-      const report = await runDriftCheck(loomRoot.rootPath, loomRoot.loomPath);
+    async ({ capture }) => {
+      const report = await runDriftCheck(loomRoot.rootPath, loomRoot.loomPath, {
+        capture: capture ?? "none",
+      });
       return jsonText(report);
     }
   );

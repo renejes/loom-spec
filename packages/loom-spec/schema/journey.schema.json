@@ -78,6 +78,10 @@
           "type": "string",
           "pattern": "^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$",
           "description": "Line range(s) like '1-80' or '12,45-50'. Use only when no symbol applies."
+        },
+        "signature_hint": {
+          "type": "string",
+          "description": "Canonical signature line captured from the symbol's source. Filled by `loom-spec validate --capture`. Drift detection compares this against the current source; mismatch = warning."
         }
       }
     }
