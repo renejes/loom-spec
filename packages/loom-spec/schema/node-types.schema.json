@@ -12,6 +12,20 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/NodeType" },
       "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" }
+    },
+    "edge_types": {
+      "type": "object",
+      "description": "Optional. Declares the typed property vocabulary for each edge kind. When present, `loom-spec validate` warns on edges that use unknown property names or values that don't match the declared types. Keys are edge kinds (request, event, data-read, …).",
+      "additionalProperties": false,
+      "properties": {
+        "request":      { "$ref": "#/$defs/EdgeType" },
+        "event":        { "$ref": "#/$defs/EdgeType" },
+        "data-read":    { "$ref": "#/$defs/EdgeType" },
+        "data-write":   { "$ref": "#/$defs/EdgeType" },
+        "signal":       { "$ref": "#/$defs/EdgeType" },
+        "dependency":   { "$ref": "#/$defs/EdgeType" },
+        "control":      { "$ref": "#/$defs/EdgeType" }
+      }
     }
   },
 
@@ -95,6 +109,23 @@
           "then": { "required": ["items"] }
         }
       ]
+    },
+
+    "EdgeType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Optional human-readable description of what this edge kind means in this project's vocabulary."
+        },
+        "properties": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Field" },
+          "default": [],
+          "description": "Typed property declarations. Each entry mirrors the Field shape used by node types."
+        }
+      }
     },
 
     "Port": {

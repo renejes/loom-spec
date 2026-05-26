@@ -7,6 +7,7 @@ import {
   listJourneys,
   readJourney,
   writeJourney,
+  readNodeTypes,
 } from "./fileOps.js";
 import { validateDiagram, validateJourney } from "../validate.js";
 import {
@@ -14,8 +15,14 @@ import {
   canonicalize,
   isSupportedExtension,
 } from "./signatures/index.js";
+import {
+  validateEdgeProperties,
+  formatEdgePropertyIssue,
+  type EdgePropertyIssue,
+} from "./edgeValidate.js";
 import type { LoomDiagram, CodeRef } from "../types/diagram.js";
 import type { LoomJourney } from "../types/journey.js";
+import type { LoomNodeTypes } from "../types/node-types.js";
 
 export type DriftIssue =
   | "missing-file"
@@ -43,6 +50,14 @@ export interface JourneyDriftFinding {
   detail?: string;
 }
 
+export interface EdgeIssueFinding {
+  diagramId: string;
+  edgeId: string;
+  issue: EdgePropertyIssue;
+  /** Pre-formatted single-line description. */
+  detail: string;
+}
+
 export interface DiagramReport {
   diagramId: string;
   title: string;
@@ -51,6 +66,7 @@ export interface DiagramReport {
   refsChecked: number;
   staleNodes: number;
   drift: DriftFinding[];
+  edgeIssues: EdgeIssueFinding[];
   schemaErrors: string[];
 }
 
@@ -71,6 +87,9 @@ export interface DriftReport {
   totalDrift: number;
   /** Refs missing a signature hint — informational only, doesn't fail CI. */
   totalSignatureMissing: number;
+  /** Edge property violations against the declared edge_types vocabulary.
+   *  Sums into the exit-code criterion alongside totalDrift. */
+  totalEdgeIssues: number;
   totalSchemaErrors: number;
   /** When capture mode is on, count of refs whose hint was written/updated. */
   capturedCount: number;
@@ -227,10 +246,23 @@ export async function runDriftCheck(
   const captureMode: DriftCaptureMode = options.capture ?? "none";
   const summaries = await listDiagrams(loomPath);
   const journeySummaries = await listJourneys(loomPath);
+
+  // Load node-types once for the edge vocabulary check. If unavailable
+  // (rare; would mean .loom/ is broken), all edges silently pass that
+  // check — the diagram schema validation will report the underlying
+  // problem.
+  let nodeTypes: LoomNodeTypes | null = null;
+  try {
+    nodeTypes = await readNodeTypes(loomPath);
+  } catch {
+    nodeTypes = null;
+  }
+
   const perDiagram: DiagramReport[] = [];
   const perJourney: JourneyReport[] = [];
   let totalDrift = 0;
   let totalSignatureMissing = 0;
+  let totalEdgeIssues = 0;
   let totalSchemaErrors = 0;
   let capturedCount = 0;
 
@@ -252,6 +284,7 @@ export async function runDriftCheck(
         refsChecked: 0,
         staleNodes: 0,
         drift: [],
+        edgeIssues: [],
         schemaErrors: [`failed to read: ${(e as Error).message}`],
       });
       totalSchemaErrors++;
@@ -305,6 +338,24 @@ export async function runDriftCheck(
       mutations.diagramWrites.set(s.id, diagram);
     }
 
+    // Edge vocabulary check (warning-style, but counts as drift for the
+    // exit code — the project explicitly opts in by declaring edge_types).
+    const edgeIssues: EdgeIssueFinding[] = [];
+    if (nodeTypes?.edge_types) {
+      for (const edge of diagram.edges) {
+        const findings = validateEdgeProperties(edge, nodeTypes);
+        for (const f of findings) {
+          edgeIssues.push({
+            diagramId: s.id,
+            edgeId: edge.id,
+            issue: f.issue,
+            detail: formatEdgePropertyIssue(f.issue),
+          });
+          totalEdgeIssues++;
+        }
+      }
+    }
+
     perDiagram.push({
       diagramId: s.id,
       title: s.title,
@@ -313,6 +364,7 @@ export async function runDriftCheck(
       refsChecked,
       staleNodes,
       drift,
+      edgeIssues,
       schemaErrors,
     });
   }
@@ -401,6 +453,7 @@ export async function runDriftCheck(
     perJourney,
     totalDrift,
     totalSignatureMissing,
+    totalEdgeIssues,
     totalSchemaErrors,
     capturedCount,
   };

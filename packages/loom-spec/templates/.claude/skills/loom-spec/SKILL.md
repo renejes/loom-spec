@@ -153,6 +153,49 @@ need to be separate nodes — otherwise you can't draw the edges
 honestly. Architecture is about connections; nodes that share a file
 but talk to different downstreams are *two* things.
 
+### Edge property vocabulary
+
+Edges have a free-form `properties` object for architectural attributes
+(`sync: false`, `retry_policy: "exponential"`, `timeout_ms: 5000`).
+Without a declared vocabulary, agents can drift naming over time —
+`sync` one day, `is_async` the next, `synchronous` later. That's
+internal spec drift the existence check can't see.
+
+If the project declares `edge_types` in `node-types.json`, validate
+warns on undeclared keys, wrong types, and invalid enum values:
+
+```json
+// .loom/node-types.json
+{
+  "types": { /* ... */ },
+  "edge_types": {
+    "request": {
+      "properties": [
+        { "name": "sync", "type": "boolean", "required": false },
+        {
+          "name": "retry_policy",
+          "type": "enum",
+          "values": ["none", "exponential", "linear"]
+        },
+        { "name": "timeout_ms", "type": "number", "min": 0, "max": 600000 }
+      ]
+    }
+  }
+}
+```
+
+Then when you write an edge:
+
+- `properties: { sync: false }` — fine
+- `properties: { is_async: true }` — warning: `unknown property 'is_async'`
+- `properties: { sync: "yes" }` — warning: `expected boolean, got string`
+- `properties: { retry_policy: "infinite" }` — warning: not in declared enum
+
+When the user wants to add a new edge attribute to the vocabulary:
+edit `node-types.json` to add the field declaration first, then update
+the edges. Agents should default to **adding to the vocabulary, not
+inventing keys** — that's the whole point of the mechanism.
+
 ### Tagging hygiene for exports
 
 `loom-spec export-html` filters by node `tags` to produce scoped bundles

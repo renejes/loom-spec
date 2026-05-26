@@ -75,5 +75,20 @@
         ]
       }
     }
+  },
+  "edge_types": {
+    "request": {
+      "description": "Typed vocabulary for request-kind edges. Demonstrates the v0.8.0 edge_types mechanism — projects use this to enforce naming conventions on edge.properties.",
+      "properties": [
+        { "name": "sync", "type": "boolean", "required": false },
+        {
+          "name": "retry_policy",
+          "type": "enum",
+          "values": ["none", "exponential", "linear"],
+          "required": false
+        },
+        { "name": "timeout_ms", "type": "number", "min": 0, "max": 600000 }
+      ]
+    }
   }
 }

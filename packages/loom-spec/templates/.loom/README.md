@@ -14,7 +14,7 @@ Opens an interactive editor on `localhost:7777`. You can pan/zoom the diagrams, 
 
 ## Files
 
-- `node-types.json` — node-type vocabulary for this project (color, icon, fields). Add types specific to your domain.
+- `node-types.json` — node-type vocabulary for this project (color, icon, fields). Add types specific to your domain. Can optionally declare an `edge_types` section to enforce a property vocabulary on edges — see [Edge property vocabulary](#edge-property-vocabulary) below.
 - `diagrams/*.flow.json` — one file per subsystem. Each is a self-contained graph of nodes and edges; `drill_down` references link between them.
 - `journeys/*.journey.json` — *(optional)* ordered walkthroughs of a diagram. Each step references a node; the viewer shows them one at a time with the rest of the diagram faded into context. Good for onboarding, runbooks, customer-flow tours.
 - `exports.json` — *(optional)* named export bundles for `loom-spec export-html` (e.g. a `user-manual` bundle that filters to `tags: ["public"]`, or a `checkout-tour` bundle that scopes to one Journey).
@@ -40,6 +40,33 @@ npx loom-spec validate
 ```
 
 Walks every `code_refs` on nodes and journey steps; warns when the referenced file or symbol is gone. Wire into CI or a pre-commit hook to catch the spec going stale.
+
+## Edge property vocabulary
+
+Edges carry a free-form `properties` object for architectural attributes (`sync: false`, `retry: "exponential"`, `timeout_ms: 5000`, etc.). To prevent the same concept getting different names over time (`sync` vs `synchronous` vs `is_sync`), declare the vocabulary in `node-types.json` under `edge_types`:
+
+```json
+{
+  "types": { /* ... */ },
+  "edge_types": {
+    "request": {
+      "properties": [
+        { "name": "sync", "type": "boolean", "required": false },
+        {
+          "name": "retry_policy",
+          "type": "enum",
+          "values": ["none", "exponential", "linear"]
+        },
+        { "name": "timeout_ms", "type": "number", "min": 0, "max": 600000 }
+      ]
+    }
+  }
+}
+```
+
+`loom-spec validate` then warns on edges that use undeclared keys, wrong value types, or out-of-range numbers. Per-kind: only request-kind edges are constrained in the example above; other kinds (event, data-read, …) stay unconstrained until you add their own entry.
+
+Opt-in: leave `edge_types` out entirely and edges are unconstrained, just like before v0.8.0.
 
 ## Format reference
 

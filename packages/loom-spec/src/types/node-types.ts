@@ -34,6 +34,18 @@ export interface LoomNodeTypes {
   types: {
     [k: string]: NodeType;
   };
+  /**
+   * Optional. Declares the typed property vocabulary for each edge kind. When present, `loom-spec validate` warns on edges that use unknown property names or values that don't match the declared types. Keys are edge kinds (request, event, data-read, …).
+   */
+  edge_types?: {
+    request?: EdgeType;
+    event?: EdgeType;
+    "data-read"?: EdgeType;
+    "data-write"?: EdgeType;
+    signal?: EdgeType;
+    dependency?: EdgeType;
+    control?: EdgeType;
+  };
 }
 export interface NodeType {
   label: string;
@@ -55,4 +67,14 @@ export interface Port {
    * Free-form signal type tag, e.g. 'audio', 'midi', 'http', 'control'.
    */
   signal?: string;
+}
+export interface EdgeType {
+  /**
+   * Optional human-readable description of what this edge kind means in this project's vocabulary.
+   */
+  description?: string;
+  /**
+   * Typed property declarations. Each entry mirrors the Field shape used by node types.
+   */
+  properties?: Field[];
 }

@@ -19,7 +19,10 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 **v0.8.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
 
-v0.8.0 adds **signature-drift detection** ([Phase 7](./done/phase-7-signature-drift.md)) — closes the gap that motivated the feature in the first place: a code_ref's symbol can still exist while its actual contract changed materially. `code_refs[].signature_hint` captures the canonical declaration line (`def parse_pdf(file_path: str) -> dict:`); on subsequent `loom-spec validate`, the current source is re-extracted and compared. Mismatch = warning that an agent or human sees. Coverage: Python, TypeScript/JSX, Rust, Svelte (the author's active stack). Other languages skip silently. `--capture` and `--recapture` flags manage the baseline. Validate also now walks journey step refs (which the v0.6.0 docs claimed but didn't actually do).
+v0.8.0 adds two related features:
+
+- **Signature-drift detection** ([Phase 7](./done/phase-7-signature-drift.md)) — closes the gap that motivated the feature in the first place: a code_ref's symbol can still exist while its actual contract changed materially. `code_refs[].signature_hint` captures the canonical declaration line (`def parse_pdf(file_path: str) -> dict:`); on subsequent `loom-spec validate`, the current source is re-extracted and compared. Mismatch = warning. Coverage: Python, TypeScript/JSX, Rust, Svelte. `--capture` and `--recapture` flags manage the baseline. Validate also now walks journey step refs (which the v0.6.0 docs claimed but didn't actually do).
+- **Edge property vocabulary** ([Phase 8](./done/phase-8-edge-vocabulary.md)) — optional `edge_types` in `node-types.json` lets a project declare typed property vocabularies per edge kind. `validate` warns on undeclared keys, wrong types, invalid enums. Solves "I forgot if I called it sync or synchronous three months ago" — the internal-consistency half of drift detection.
 
 v0.7.0 was a **quality-of-life round** ([Phase 6](./done/phase-6-quality-of-life.md)) driven by real-world feedback. Auto-layout finds a non-overlapping spot for new nodes (no more guessing `{x, y}`). Edges get a free-form `properties` field for project-specific architectural attributes (sync/async, retry policy, etc.). A new `loom_update_edge` MCP tool rounds out the diagram CRUD. SKILL.md gets a Granularity-patterns section. The `.loom/README.md` template is rewritten for cold-reader onboarding.
 
@@ -36,19 +39,20 @@ For per-version detail of what shipped when, see [`done/`](./done/):
 - [Phase 5 — Journeys](./done/phase-5-journeys.md) (v0.6.0)
 - [Phase 6 — Quality-of-life round](./done/phase-6-quality-of-life.md) (v0.7.0)
 - [Phase 7 — Signature-drift detection](./done/phase-7-signature-drift.md) (v0.8.0)
+- [Phase 8 — Edge property vocabulary](./done/phase-8-edge-vocabulary.md) (v0.8.0)
 
 ## Capabilities at a glance
 
 | Layer | What works as of v0.8.0 |
 |---|---|
-| Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. Edges carry an optional free-form `properties` object. Code-refs carry an optional `signature_hint` (filled by `validate --capture`) for drift detection. |
+| Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. Edges carry an optional free-form `properties` object — optionally constrained by `edge_types` declarations in `node-types.json` (typed vocabulary, validate warns on undeclared keys / wrong types / bad enums). Code-refs carry an optional `signature_hint` (filled by `validate --capture`) for drift detection. |
 | CLI | `init [--mcp]`, `install-mcp`, `view`, `validate [--capture | --recapture]`, `mcp`, `export-html` (with `--from-journey`). |
 | MCP server | 19 tools — 11 for diagrams + 8 for journeys. All mutations schema-validated and (for journeys) cross-checked against the referenced diagram before write. `loom_add_node` auto-places when no position is provided. `loom_validate` accepts `capture: "capture" | "recapture" | "none"` to manage signature_hint baselines. |
 | Browser editor | xyflow-based diagram canvas with light/dark theme, drag, debounced auto-save, code-refs editing, tags chips, ports, inline validation, drill-down between diagrams, group frames, parallel-edge offsets. +Add auto-places the new node next to existing ones. Switcher includes a Journeys section. |
 | Journey viewer | Read-only step navigator (prev/next, keyboard ←/→/Home/End), current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity, edge between consecutive steps pulses, collapsible step sidebar with code-refs. |
 | Live sync | chokidar watcher with self-write suppression; SSE for both diagram and journey changes; UI refetches on external edits. |
 | Agent skill | `.claude/skills/loom-spec/SKILL.md` with 7 worked examples (incl. journey authoring) + tagging hygiene + workflow-vs-tags decision rule + granularity patterns ("how many nodes per file") + security warnings. |
-| Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Two checks: existence (file + symbol + line range) and signature drift (canonical declaration line, language-aware for Python/TS/JSX/Rust/Svelte). Exits non-zero on schema errors, broken refs, and signature drift; `signature-missing` is informational. |
+| Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Three checks: existence (file + symbol + line range), signature drift (canonical declaration line, language-aware for Python/TS/JSX/Rust/Svelte), and edge property vocabulary (if `edge_types` declared in node-types). Exits non-zero on schema errors, broken refs, signature drift, and edge-property issues; `signature-missing` is informational. |
 | Export | Standalone interactive HTML; tag-based filter with cascade rules (drop edges to dropped nodes, shrink groups, clear drill-downs); named bundles via `.loom/exports.json`; `--diagram <id>` for single-diagram exports; `--include-tag` / `--exclude-tag`; `--from-journey <id>` for focused walkthrough exports with `defaultView` hint. |
 
 ## Architecture
@@ -167,6 +171,7 @@ End-to-end checks that currently pass (via `pnpm --filter loom-spec typecheck` p
 - **MCP-journeys smoke** (`scripts/smoke-mcp-journeys.ts`, 29 assertions) — spawns `loom-spec mcp` against a tmpfs copy of the fixture and exercises all 8 journey tools over stdio, with at least one negative path per tool. Byte-for-byte cleanup leaves the original fixture untouched.
 - **MCP-diagrams smoke** (`scripts/smoke-mcp-diagrams.ts`, 13 assertions) — covers the v0.7.0 additions: auto-layout placement, edge `properties` round-trip, `loom_update_edge` patch semantics.
 - **Signatures smoke** (`scripts/smoke-signatures.ts`, 30 assertions) — 16 extractor unit checks (Python/TS/Rust/Svelte canonical shapes incl. generics, lifetimes, async, modifiers, multi-line) + 14 end-to-end (write source in 4 languages, capture hints, mutate a signature, detect drift, recapture acknowledges new baseline).
+- **Edge-vocab smoke** (`scripts/smoke-edge-vocab.ts`, 11 assertions) — unit checks for each failure mode (unknown key / wrong type / bad enum / out-of-range / required-missing) plus end-to-end via `runDriftCheck`.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite. Plus `dist/view-export/` (single chunk) for the standalone HTML embed.
 - npm-installed flow via the published `loom-spec@0.8.0`.
 - Real-world use: the author's day-to-day project uses the diagram editor + MCP tools + drift validation + HTML export.

@@ -43,7 +43,8 @@ function isWarn(issue: string): boolean {
 function printDiagram(d: DiagramReport): void {
   const hasErrors =
     d.schemaErrors.length > 0 ||
-    d.drift.some((f) => !isWarn(f.issue));
+    d.drift.some((f) => !isWarn(f.issue)) ||
+    d.edgeIssues.length > 0;
   const hasWarn = d.drift.some((f) => isWarn(f.issue));
   const status = hasErrors ? ICON_BAD : hasWarn ? ICON_WARN : ICON_OK;
   console.log(`${status} ${d.diagramId}.flow.json — ${d.title}`);
@@ -59,7 +60,14 @@ function printDiagram(d: DiagramReport): void {
       `  ${icon} ${f.nodeId} → ${f.ref.path}${f.ref.symbol ? `#${f.ref.symbol}` : ""}: ${formatIssue(f.detail, f.issue)}`
     );
   }
-  if (d.schemaErrors.length === 0 && d.drift.length === 0) {
+  for (const f of d.edgeIssues) {
+    console.log(`  ${ICON_BAD} edge ${f.edgeId}: ${f.detail}`);
+  }
+  if (
+    d.schemaErrors.length === 0 &&
+    d.drift.length === 0 &&
+    d.edgeIssues.length === 0
+  ) {
     console.log(`  ${ICON_INFO} no issues`);
   }
 }
@@ -127,6 +135,9 @@ export async function runValidate(args: ValidateArgs): Promise<void> {
   if (report.totalDrift > 0) {
     summary.push(`${report.totalDrift} drift finding(s)`);
   }
+  if (report.totalEdgeIssues > 0) {
+    summary.push(`${report.totalEdgeIssues} edge property issue(s)`);
+  }
   if (report.totalSignatureMissing > 0) {
     summary.push(
       `${report.totalSignatureMissing} ref(s) without a signature hint (informational)`
@@ -137,7 +148,9 @@ export async function runValidate(args: ValidateArgs): Promise<void> {
   }
 
   const docCount = report.perDiagram.length + report.perJourney.length;
-  if (report.totalDrift + report.totalSchemaErrors === 0) {
+  const failCount =
+    report.totalDrift + report.totalSchemaErrors + report.totalEdgeIssues;
+  if (failCount === 0) {
     const tail = summary.length > 0 ? ` (${summary.join(", ")})` : "";
     console.log(`${ICON_OK} All ${docCount} document(s) clean${tail}.`);
     process.exit(0);

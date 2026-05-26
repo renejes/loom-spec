@@ -39,11 +39,19 @@ journey by default.
 
 ## What v0.8.0 changed (critical context)
 
-v0.8.0 added Phase 7 — signature-drift detection across the four
-languages the author actively uses (Python, TS/JSX, Rust, Svelte).
+v0.8.0 added two related drift-detection features:
+
+**Phase 7 — signature drift** for Python, TS/JSX, Rust, Svelte.
 Closes the gap that the existence check left open: if a function's
 contract changes but the symbol name stays the same, the spec is
 silently stale. Now `loom-spec validate` catches it.
+
+**Phase 8 — edge property vocabulary**. Optional `edge_types`
+declaration in `node-types.json` lets a project type its edge
+properties (`sync: boolean`, `retry_policy: enum`, etc.). Validate
+warns on undeclared keys, wrong types, invalid enums. Solves the
+"three months later I've forgotten what I called this property"
+drift inside the spec itself.
 
 Mechanics:
 - `code_refs[].signature_hint` (optional string) captures the
@@ -153,10 +161,11 @@ based on real pain, or wait for it. Top candidates:
 1. `documentation/project-status.md` — current state, what works,
    how it's wired together. **Most important read.**
 2. `documentation/next-steps.md` — open backlog with priorities.
-3. `documentation/done/phase-7-signature-drift.md` — the most
-   recent shipped work. What got built, why regex over tree-sitter,
-   what's deliberately not in scope (auto-capture on MCP write,
-   other languages).
+3. `documentation/done/phase-7-signature-drift.md` and
+   `phase-8-edge-vocabulary.md` — the most recent shipped work,
+   both in v0.8.0. Phase 7 explains the signature-drift extractors
+   and why regex over tree-sitter. Phase 8 explains why edge_types
+   went into node-types.json instead of a separate file.
 4. `documentation/journeys.md` — user-facing feature doc for the
    v0.6.0 Journeys addition. Understand what Journeys are and aren't.
 5. `documentation/done/phase-4-timeline-removal.md` — the v0.5.0
@@ -234,8 +243,11 @@ based on real pain, or wait for it. Top candidates:
     covers auto-layout + edge properties + `loom_update_edge`)
   - `packages/loom-spec/scripts/smoke-signatures.ts` (30 assertions,
     extractor units + e2e capture/drift/recapture across 4 languages)
-  All four clean up byte-for-byte. Run them after changes that touch
-  the export pipeline, the MCP server, or the signatures module.
+  - `packages/loom-spec/scripts/smoke-edge-vocab.ts` (11 assertions,
+    edge property validation unit + e2e)
+  All five clean up byte-for-byte. Run them after changes that touch
+  the export pipeline, the MCP server, the signatures module, or the
+  edge-property validator.
 - npm publishing: account has `auth-and-writes` 2FA. The reliable
   flow is `npm logout && npm login` (browser passkey) then
   `npm publish` (interactive OTP). If the token in `~/.npmrc` ever
