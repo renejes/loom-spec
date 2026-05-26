@@ -59,6 +59,65 @@ For any task that touches structure:
   `<name>.flow.json` instead of cramming it into an existing diagram.
 - Link from the overview with a `drill_down` reference if appropriate.
 
+### Granularity — how many nodes?
+
+A node represents a **concept**, not a function. The two failure modes
+are equally bad: one node per file (no architecture, just an outline),
+or ten nodes per file (chaos, no signal). When in doubt: fewer nodes,
+more `code_refs[]`. Three concrete patterns the architecture you're
+modelling will usually fit one of:
+
+**Sidecar / controller with N endpoints** — *one* node, N `code_refs`.
+The endpoints are not architecturally distinct; the *service* is the
+architectural unit. Use a `properties` field like `endpoints: 7` if
+the count itself matters for the spec.
+
+```
+{ id: "pricing-api", type: "service", label: "Pricing API",
+  code_refs: [
+    { path: "src/api/pricing.ts", symbol: "getQuote" },
+    { path: "src/api/pricing.ts", symbol: "getCatalog" },
+    { path: "src/api/pricing.ts", symbol: "getDiscount" }
+  ] }
+```
+
+**Multi-stage pipeline (parse_stage_1..4)** — *split into a drill-down
+when stages are conceptually separate work*, otherwise one node + N
+refs. The test: does the user ever talk about a single stage in
+isolation, or always about "the pipeline"?
+
+```
+# Conceptually distinct stages → one node + drill_down to a sub-diagram
+{ id: "ingestion-pipeline", type: "service", label: "Ingestion",
+  drill_down: "ingestion-stages" }
+
+# Sequential calls inside one logical operation → one node + N refs
+{ id: "request-validator", type: "service", label: "Request Validator",
+  code_refs: [
+    { path: "src/validate.ts", symbol: "checkAuth" },
+    { path: "src/validate.ts", symbol: "checkRateLimit" },
+    { path: "src/validate.ts", symbol: "checkPayload" }
+  ] }
+```
+
+**Adapter with N implementations** — *one* node + tags, unless
+implementations have different connectivity. The adapter pattern's
+whole point is interchangeability: from the architecture's view,
+"the storage layer" is one concept; `S3Storage` vs. `LocalStorage`
+is a deployment detail.
+
+```
+{ id: "storage", type: "service", label: "Storage Adapter",
+  properties: { interface: "Storage", implementations: ["S3", "Local"] },
+  tags: ["public"] }
+```
+
+**When to break the rule and split**: if two pieces of the same file
+have *different upstream/downstream connections* in the diagram, they
+need to be separate nodes — otherwise you can't draw the edges
+honestly. Architecture is about connections; nodes that share a file
+but talk to different downstreams are *two* things.
+
 ### Tagging hygiene for exports
 
 `loom-spec export-html` filters by node `tags` to produce scoped bundles

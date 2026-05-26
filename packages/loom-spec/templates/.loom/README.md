@@ -1,25 +1,46 @@
 # .loom — Architecture Spec
 
-This directory contains the node-based architecture spec for the project. It is **the source of truth** for how the app is structured, kept in sync with code by humans and AI agents together.
+This directory holds the **node-based architecture spec** for the project — a structured, git-diffable description of how the app is put together. The bet: keep it in the repo, edited by humans (visually) and AI agents (programmatically), and the spec stops drifting from reality.
 
-## Files
+This is a **spec layer, not an execution layer**. Nodes describe; they don't run.
 
-- `node-types.json` — defines the available node types for this project. Customize freely; add types specific to your domain.
-- `diagrams/*.flow.json` — one file per subsystem. Each is a self-contained graph.
-- `exports.json` — (optional) named export bundles for `loom-spec export-html` (e.g. a `user-manual` bundle that filters to `tags: ["public"]`).
-
-## Viewing and editing
+## See what's in here
 
 ```bash
 npx loom-spec view
 ```
 
-Opens a browser-based editor on `localhost:7777`. Changes are written back to the JSON files.
+Opens an interactive editor on `localhost:7777`. You can pan/zoom the diagrams, click nodes to inspect them, drill down between subsystems, and pick a Journey from the switcher to walk through a workflow step by step. Edits are auto-saved back to the JSON files in this directory.
 
-## For AI agents
+## Files
 
-See `.claude/skills/loom-spec/SKILL.md`. The skill explains when to read and update these files.
+- `node-types.json` — node-type vocabulary for this project (color, icon, fields). Add types specific to your domain.
+- `diagrams/*.flow.json` — one file per subsystem. Each is a self-contained graph of nodes and edges; `drill_down` references link between them.
+- `journeys/*.journey.json` — *(optional)* ordered walkthroughs of a diagram. Each step references a node; the viewer shows them one at a time with the rest of the diagram faded into context. Good for onboarding, runbooks, customer-flow tours.
+- `exports.json` — *(optional)* named export bundles for `loom-spec export-html` (e.g. a `user-manual` bundle that filters to `tags: ["public"]`, or a `checkout-tour` bundle that scopes to one Journey).
 
-## Format
+## Editing
 
-See the JSON Schemas shipped with the `loom-spec` package.
+- **Visual editor** — `npx loom-spec view` (above). Drag nodes, edit fields in the inspector, click + Add for new ones.
+- **AI agents** — use the MCP server (`npx loom-spec mcp`, register in `.mcp.json`). 18 tools for diagram + journey editing, all schema-validated before write. See `.claude/skills/loom-spec/SKILL.md` for when and how.
+- **By hand** — the JSON files are stable and human-editable. The `loom-spec view` server validates on every write, so invalid JSON gets rejected with a clear error.
+
+## Publishing
+
+```bash
+npx loom-spec export-html --out docs/architecture.html
+```
+
+Produces a single self-contained HTML file with the same interactive viewer baked in — drop it into a docs site, wiki, GitHub Pages, email attachment, anywhere. Tag-based filtering (`--include-tag public`) lets you ship scoped versions for different audiences. `--from-journey <id>` produces a focused walkthrough.
+
+## Drift detection
+
+```bash
+npx loom-spec validate
+```
+
+Walks every `code_refs` on nodes and journey steps; warns when the referenced file or symbol is gone. Wire into CI or a pre-commit hook to catch the spec going stale.
+
+## Format reference
+
+The JSON Schemas ship with the `loom-spec` npm package at `node_modules/loom-spec/schema/`. The format is intentionally stable and tools-agnostic — you can read and edit `.loom/` files without the CLI installed.

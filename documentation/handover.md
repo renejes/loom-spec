@@ -1,4 +1,4 @@
-# Handover prompt — continue after v0.6.0 release
+# Handover prompt — continue after v0.7.0 release
 
 Copy everything in the fenced block below into a fresh Claude Code chat in the project root. It briefs the assistant on context, current state, conventions, and what's next.
 
@@ -7,9 +7,9 @@ Copy everything in the fenced block below into a fresh Claude Code chat in the p
 ````
 I'm continuing work on `loom-spec`, an open-source spec-as-code tool
 that keeps a node-based architecture spec inside the repo. You're
-picking up after v0.6.0 shipped — which added Journeys (ordered
-walkthroughs of an architecture). Read the briefing below, then read
-five docs in order, then propose what to do next.
+picking up after v0.7.0 shipped — a quality-of-life round on top of
+v0.6.0's Journeys feature. Read the briefing below, then read five
+docs in order, then propose what to do next.
 
 ## What loom-spec is (30 seconds)
 
@@ -28,14 +28,43 @@ A node-based architecture spec that lives in a repo. File kinds:
 The tool is a spec layer, NOT an execution layer. Nodes describe.
 The bet: keep the spec in the repo, edited by humans (browser-based
 editor) AND AI agents (via JSON directly OR via the MCP server we
-ship — 18 tools, 10 for diagrams + 8 for journeys). Drift detection
+ship — 19 tools, 11 for diagrams + 8 for journeys). Drift detection
 catches when `code_refs` point at code that no longer exists.
 Standalone HTML export embeds the same viewer into manuals / wikis /
 docs sites with tag-based filtering for public vs internal, and
 `--from-journey` for focused walkthrough exports that open at the
 journey by default.
 
-## What v0.6.0 changed (critical context)
+## What v0.7.0 changed (critical context)
+
+v0.7.0 was a small quality-of-life round triggered by real-world
+feedback from another Claude Code session using v0.6.0 on a real
+project. Four concrete pain points; this release fixed three and
+punted the fourth:
+
+- **Auto-layout for new nodes** (`src/layout.ts`). `loom_add_node`
+  without a position now picks a non-overlapping spot to the right
+  of existing nodes. Same heuristic powers the browser editor's
+  +Add button. Explicit positions still win.
+- **Edge `properties` field**. Free-form object on edges for
+  project-specific architectural attributes (sync/async, retry
+  policy, timeout). Deliberately *not* a named enum — the v0.5.0
+  timeline removal is the cautionary tale against locking in
+  vocabulary too early.
+- **New `loom_update_edge` MCP tool** so agents can change edge
+  properties without delete+re-add (which would lose the edge id).
+- **Granularity patterns** section in SKILL.md — three concrete
+  patterns (sidecar, multi-stage pipeline, adapter) for the "how
+  many nodes per file" question.
+- **`.loom/README.md` template rewrite** for cold-reader
+  onboarding.
+
+Punted to backlog #21: signature-fingerprint drift check. The
+honest implementation needs language-aware AST parsing, which is
+multi-week per language. See `done/phase-6-quality-of-life.md`
+for the reasoning.
+
+## What v0.6.0 changed (critical context — still relevant)
 
 v0.6.0 added Phase 5 — Journeys. The work shipped in four slices
 plus a docs/skill/version slice:
@@ -67,10 +96,11 @@ Deliberate non-additions in this phase:
 
 ## Where it stands right now
 
-- **`loom-spec@0.6.0`** is the latest on npm.
+- **`loom-spec@0.7.0`** is the latest on npm.
 - Real-world adoption confirmed (the author uses it on a separate
   project; reports the diagram editor + MCP tools + drift + export
-  work as expected. Journey use TBD as the feature is brand new).
+  work as expected. Journey use is light so far; the v0.7.0 round
+  came from concrete pain in the real-world project).
 - Repo: https://github.com/renejes/loom-spec
 - Working directory: `/Users/renejesser/Desktop/Programming - Projekte/graphical-programming`
 - pnpm workspace; the package lives in `packages/loom-spec/`.
@@ -96,12 +126,11 @@ based on real pain, or wait for it. Top candidates:
 1. `documentation/project-status.md` — current state, what works,
    how it's wired together. **Most important read.**
 2. `documentation/next-steps.md` — open backlog with priorities.
-3. `documentation/journeys.md` — user-facing feature doc for the
-   v0.6.0 addition. Understand what Journeys are and aren't.
-4. `documentation/done/phase-5-journeys.md` — the original plan +
-   "what shipped vs. the plan" delta. Read this to understand the
-   deliberate scope decisions (read-only-first, dimming addition,
-   single pulse instead of "path so far").
+3. `documentation/done/phase-6-quality-of-life.md` — the most
+   recent shipped work. Why the four QoL fixes, why we punted
+   signature-fingerprint, where the test coverage gap was.
+4. `documentation/journeys.md` — user-facing feature doc for the
+   v0.6.0 Journeys addition. Understand what Journeys are and aren't.
 5. `documentation/done/phase-4-timeline-removal.md` — the v0.5.0
    scope-down reasoning. The "don't hoard features" principle that
    governs everything else here.
@@ -173,7 +202,9 @@ based on real pain, or wait for it. Top candidates:
     includes `--from-journey` cases)
   - `packages/loom-spec/scripts/smoke-mcp-journeys.ts` (29 assertions,
     spawns the MCP server and exercises all 8 journey tools)
-  Both clean up byte-for-byte. Run them after changes that touch
+  - `packages/loom-spec/scripts/smoke-mcp-diagrams.ts` (13 assertions,
+    covers auto-layout + edge properties + `loom_update_edge`)
+  All three clean up byte-for-byte. Run them after changes that touch
   the export pipeline or the MCP server.
 - npm publishing: account has `auth-and-writes` 2FA. The reliable
   flow is `npm logout && npm login` (browser passkey) then
@@ -191,9 +222,11 @@ based on real pain, or wait for it. Top candidates:
    to over-build.
 
 Tone: opinionated, honest about trade-offs, push back when I'm
-wrong. v0.5.0 and v0.6.0's Phase 5 deliberate-deferral are both
-proof this project will cut or postpone features that aren't earning
-their keep. Apply the same scrutiny going forward.
+wrong. v0.5.0 (timeline removal), v0.6.0's Phase 5 (read-only-first
+journeys, no editor UI), and v0.7.0's Phase 6 (defer
+signature-fingerprint behind a real-pain trigger) are three proof
+points this project will cut or postpone features that aren't
+earning their keep. Apply the same scrutiny going forward.
 
 Working directory is
 `/Users/renejesser/Desktop/Programming - Projekte/graphical-programming`.

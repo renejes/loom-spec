@@ -17,9 +17,11 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.6.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
+**v0.7.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
 
-v0.6.0 adds **Journeys** — a new file kind for ordered, untimed walkthroughs of the architecture. Pick a journey from the switcher and the viewer narrows to its steps: current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity. Same source compiles into an HTML export via `--from-journey <id>` that opens directly at the walkthrough. The 8 MCP tools (`loom_create_journey`, `loom_add_step`, etc.) make it the natural AI-author surface; the in-browser editor for journeys is deliberately deferred until a concrete pain point shows up.
+v0.7.0 is a **quality-of-life round** ([Phase 6](./done/phase-6-quality-of-life.md)) driven by real-world feedback from a separate session using v0.6.0 on a real project. Auto-layout finds a non-overlapping spot for new nodes (no more guessing `{x, y}`). Edges get a free-form `properties` field for project-specific architectural attributes (sync/async, retry policy, etc.). A new `loom_update_edge` MCP tool rounds out the diagram CRUD. SKILL.md gets a Granularity-patterns section that documents the "how many nodes per file" question that bites every new project. The `.loom/README.md` template is rewritten for cold-reader onboarding. A signature-fingerprint drift check was punted to backlog #21 — the honest implementation needs language-aware AST parsing.
+
+v0.6.0 added **Journeys** — a new file kind for ordered, untimed walkthroughs of the architecture. Pick a journey from the switcher and the viewer narrows to its steps: current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity. Same source compiles into an HTML export via `--from-journey <id>` that opens directly at the walkthrough. The 8 MCP tools (`loom_create_journey`, `loom_add_step`, etc.) make it the natural AI-author surface; the in-browser editor for journeys is deliberately deferred until a concrete pain point shows up.
 
 v0.5.0 before that was a **deliberate scope-down**. The timeline view (built across v0.2.0–v0.3.0 as a DAW-style architecture playback) was removed because the only confirmed user didn't use it. Same for `loom-spec import-trace` (OTel JSON → timeline) and the 5 timeline-related MCP tools. The conceptual surface dropped by ~30%, the export bundle shrank, and the product story sharpened to "agent-readable architecture spec exportable as interactive HTML, with guided walkthroughs of common workflows" — Journeys filled the walkthrough half in v0.6.0.
 
@@ -30,18 +32,19 @@ For per-version detail of what shipped when, see [`done/`](./done/):
 - [Phase 3 — Interactive HTML export](./done/phase-3-export.md) (v0.4.0)
 - [Phase 4 — Timeline removal](./done/phase-4-timeline-removal.md) (v0.5.0)
 - [Phase 5 — Journeys](./done/phase-5-journeys.md) (v0.6.0)
+- [Phase 6 — Quality-of-life round](./done/phase-6-quality-of-life.md) (v0.7.0)
 
 ## Capabilities at a glance
 
-| Layer | What works as of v0.6.0 |
+| Layer | What works as of v0.7.0 |
 |---|---|
-| Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. |
+| Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. Edges carry an optional free-form `properties` object for project-specific attributes (sync/async, retry, timeout, etc.). |
 | CLI | `init [--mcp]`, `install-mcp`, `view`, `validate`, `mcp`, `export-html` (with `--from-journey`). |
-| MCP server | 18 tools — 10 for diagrams (list/read/add-node/update/mark-stale/delete-node/add-edge/delete-edge/validate/read-node-types) + 8 for journeys (list/read/create/add-step/update-step/delete-step/reorder-steps/delete). All mutations schema-validated and (for journeys) cross-checked against the referenced diagram before write. |
-| Browser editor | xyflow-based diagram canvas with light/dark theme, drag, debounced auto-save, code-refs editing, tags chips, ports, inline validation, drill-down between diagrams, group frames, parallel-edge offsets. Switcher includes a Journeys section. |
+| MCP server | 19 tools — 11 for diagrams (list/read/add-node/update-node/mark-stale/delete-node/add-edge/update-edge/delete-edge/validate/read-node-types) + 8 for journeys (list/read/create/add-step/update-step/delete-step/reorder-steps/delete). All mutations schema-validated and (for journeys) cross-checked against the referenced diagram before write. `loom_add_node` auto-places the new node when no position is provided. |
+| Browser editor | xyflow-based diagram canvas with light/dark theme, drag, debounced auto-save, code-refs editing, tags chips, ports, inline validation, drill-down between diagrams, group frames, parallel-edge offsets. +Add auto-places the new node next to existing ones. Switcher includes a Journeys section. |
 | Journey viewer | Read-only step navigator (prev/next, keyboard ←/→/Home/End), current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity, edge between consecutive steps pulses, collapsible step sidebar with code-refs. |
 | Live sync | chokidar watcher with self-write suppression; SSE for both diagram and journey changes; UI refetches on external edits. |
-| Agent skill | `.claude/skills/loom-spec/SKILL.md` with 7 worked examples (incl. journey authoring) + tagging hygiene + workflow-vs-tags decision rule + security warnings. |
+| Agent skill | `.claude/skills/loom-spec/SKILL.md` with 7 worked examples (incl. journey authoring) + tagging hygiene + workflow-vs-tags decision rule + granularity patterns ("how many nodes per file") + security warnings. |
 | Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Exits non-zero for CI / pre-commit. |
 | Export | Standalone interactive HTML; tag-based filter with cascade rules (drop edges to dropped nodes, shrink groups, clear drill-downs); named bundles via `.loom/exports.json`; `--diagram <id>` for single-diagram exports; `--include-tag` / `--exclude-tag`; `--from-journey <id>` for focused walkthrough exports with `defaultView` hint. |
 
@@ -159,8 +162,9 @@ End-to-end checks that currently pass (via `pnpm --filter loom-spec typecheck` p
 - TypeScript types autogenerate and the entire codebase typechecks cleanly.
 - **Export-html smoke** (`scripts/smoke-export-html.ts`, 35 assertions) — full export / `--diagram` / `--include-tag` cascade / `--exclude-tag` / `--from-journey` (single-diagram narrowing, journey embedding, defaultView, step pruning under tag conflict) / named bundles for both tag and journey scopes / unknown-bundle and unknown-journey errors.
 - **MCP-journeys smoke** (`scripts/smoke-mcp-journeys.ts`, 29 assertions) — spawns `loom-spec mcp` against a tmpfs copy of the fixture and exercises all 8 journey tools over stdio, with at least one negative path per tool. Byte-for-byte cleanup leaves the original fixture untouched.
+- **MCP-diagrams smoke** (`scripts/smoke-mcp-diagrams.ts`, 13 assertions) — covers the v0.7.0 additions: auto-layout placement (no overlap, to-the-right-of-rightmost), edge `properties` round-trip, `loom_update_edge` patch semantics and missing-id error.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite. Plus `dist/view-export/` (single chunk) for the standalone HTML embed.
-- npm-installed flow via the published `loom-spec@0.6.0`.
+- npm-installed flow via the published `loom-spec@0.7.0`.
 - Real-world use: the author's day-to-day project uses the diagram editor + MCP tools + drift validation + HTML export.
 
 ## What is not yet verified

@@ -14,6 +14,7 @@ import {
 import { validateDiagram, validateJourney } from "../validate.js";
 import { crossCheckJourney } from "../server/journeyCheck.js";
 import { runDriftCheck } from "../server/drift.js";
+import { computeNewNodePosition } from "../layout.js";
 import type { LoomRoot } from "../server/findLoomRoot.js";
 import type {
   LoomDiagram,
@@ -173,7 +174,7 @@ export function createMcpServer(loomRoot: LoomRoot) {
     {
       title: "Add node",
       description:
-        "Append a new node to a diagram. Returns the auto-generated id. The new node defaults to status='planned'. Position defaults to {200, 200}; the user can re-arrange in the UI.",
+        "Append a new node to a diagram. Returns the auto-generated id. The new node defaults to status='planned'. If position is omitted, a non-overlapping spot is chosen automatically (to the right of the existing nodes at the median y); pass an explicit position only when you have a specific layout in mind.",
       inputSchema: {
         diagram: z.string().describe("Diagram id to add the node to"),
         type: z.string().describe("Node type key (must exist in node-types.json)"),
@@ -205,7 +206,7 @@ export function createMcpServer(loomRoot: LoomRoot) {
         type,
         label,
         description,
-        position: position ?? { x: 200, y: 200 },
+        position: position ?? computeNewNodePosition(d),
         status,
         code_refs: code_refs ?? [],
         properties: properties ?? {},
@@ -319,7 +320,7 @@ export function createMcpServer(loomRoot: LoomRoot) {
     "loom_add_edge",
     {
       title: "Add edge",
-      description: "Connect two nodes. Use 'node-id:port-name' syntax for typed ports.",
+      description: "Connect two nodes. Use 'node-id:port-name' syntax for typed ports. The optional 'properties' field is free-form — use project conventions for things like { sync: false, retry: 'exponential', timeout_ms: 5000 }.",
       inputSchema: {
         diagram: z.string(),
         from: z.string().describe("Source node id (or 'node-id:port-name')"),
@@ -327,9 +328,11 @@ export function createMcpServer(loomRoot: LoomRoot) {
         kind: z.enum(EDGE_KINDS),
         label: z.string().optional(),
         description: z.string().optional(),
+        direction: z.enum(["forward", "bidirectional"]).optional(),
+        properties: z.record(z.string(), z.unknown()).optional(),
       },
     },
-    async ({ diagram, from, to, kind, label, description }) => {
+    async ({ diagram, from, to, kind, label, description, direction, properties }) => {
       const r = await readDiagramOrError(loomRoot.loomPath, diagram);
       if (!r.ok) return r.error;
       const d = r.diagram;
@@ -340,11 +343,53 @@ export function createMcpServer(loomRoot: LoomRoot) {
         kind,
         label,
         description,
+        direction,
+        properties,
       };
       d.edges.push(edge);
       const err = await persist(loomRoot.loomPath, diagram, d);
       if (err) return err;
       return jsonText({ ok: true, id: edge.id });
+    }
+  );
+
+  server.registerTool(
+    "loom_update_edge",
+    {
+      title: "Update edge",
+      description:
+        "Patch fields on an existing edge. Only the fields you pass are changed. Pass null on a nullable field to clear it.",
+      inputSchema: {
+        diagram: z.string(),
+        id: z.string().describe("Edge id"),
+        patch: z
+          .object({
+            kind: z.enum(EDGE_KINDS).optional(),
+            label: z.string().nullable().optional(),
+            description: z.string().nullable().optional(),
+            direction: z.enum(["forward", "bidirectional"]).optional(),
+            properties: z.record(z.string(), z.unknown()).optional(),
+          })
+          .describe("Fields to merge"),
+      },
+    },
+    async ({ diagram, id, patch }) => {
+      const r = await readDiagramOrError(loomRoot.loomPath, diagram);
+      if (!r.ok) return r.error;
+      const d = r.diagram;
+      const idx = d.edges.findIndex((e) => e.id === id);
+      if (idx < 0) return errorText(`edge '${id}' not found`);
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null) continue;
+        if (v !== undefined) cleaned[k] = v;
+      }
+      if (patch.label === null) cleaned["label"] = undefined;
+      if (patch.description === null) cleaned["description"] = undefined;
+      d.edges[idx] = { ...d.edges[idx]!, ...cleaned } as LoomEdge;
+      const err = await persist(loomRoot.loomPath, diagram, d);
+      if (err) return err;
+      return jsonText({ ok: true });
     }
   );
 

@@ -6,6 +6,7 @@ import { AddNodeMenu } from "./AddNodeMenu";
 import { useDiagramState, uniqueNodeId } from "../state";
 import { createEmptyDiagram } from "../loadDiagram";
 import { isExportMode } from "../exportMode";
+import { computeNewNodePosition } from "../../layout";
 import type { DiagramSummary } from "../loadDiagram";
 import type { JourneySummary } from "../loadJourney";
 import type { Node as LoomNode } from "../../types/diagram";
@@ -92,7 +93,7 @@ export function DiagramView({
         id: newId,
         type: typeKey,
         label: "Untitled",
-        position: { x: 200, y: 200 },
+        position: computeNewNodePosition(state.diagram),
         status: "planned",
         code_refs: [],
         properties: {},

@@ -83,6 +83,12 @@ export interface Edge {
   label?: string;
   description?: string;
   direction?: "forward" | "bidirectional";
+  /**
+   * Free-form architectural attributes for this edge. Loom-spec doesn't enforce a vocabulary — use project conventions (e.g. { sync: false, retry: 'exponential', timeout_ms: 5000, idempotent: true }). Stays out of the way for projects that don't need them.
+   */
+  properties?: {
+    [k: string]: unknown;
+  };
 }
 export interface Group {
   id: string;
