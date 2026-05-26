@@ -29,10 +29,11 @@ Usage:
       pre-commit hook.
 
   loom-spec mcp [--root <dir>]
-      Start a Model Context Protocol server on stdio. Exposes 10 tools
+      Start a Model Context Protocol server on stdio. Exposes 18 tools
       for editing diagrams (loom_list_diagrams, loom_add_node,
-      loom_add_edge, loom_validate, …). Wire it into Claude Code's
-      mcp.json (or any MCP-capable client).
+      loom_add_edge, loom_validate, …) and journeys (loom_list_journeys,
+      loom_create_journey, loom_add_step, loom_reorder_steps, …). Wire
+      it into Claude Code's mcp.json (or any MCP-capable client).
 
   loom-spec export-html [<bundle-name>] [--out <path>] [--diagram <id>]
                         [--include-tag <comma-list>] [--exclude-tag <comma-list>]

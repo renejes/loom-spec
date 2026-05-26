@@ -6,8 +6,13 @@ import {
   readDiagram,
   writeDiagram,
   readNodeTypes,
+  listJourneys,
+  readJourney,
+  writeJourney,
+  deleteJourney,
 } from "../server/fileOps.js";
-import { validateDiagram } from "../validate.js";
+import { validateDiagram, validateJourney } from "../validate.js";
+import { crossCheckJourney } from "../server/journeyCheck.js";
 import { runDriftCheck } from "../server/drift.js";
 import type { LoomRoot } from "../server/findLoomRoot.js";
 import type {
@@ -15,6 +20,7 @@ import type {
   Node as LoomNode,
   Edge as LoomEdge,
 } from "../types/diagram.js";
+import type { LoomJourney, JourneyStep } from "../types/journey.js";
 
 const STATUSES = ["planned", "implemented", "stale", "deprecated"] as const;
 const EDGE_KINDS = [
@@ -77,10 +83,49 @@ async function persist(loomPath: string, id: string, d: LoomDiagram) {
   return null;
 }
 
+async function readJourneyOrError(loomPath: string, id: string) {
+  try {
+    return { ok: true as const, journey: await readJourney(loomPath, id) };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return { ok: false as const, error: errorText(`journey '${id}' not found`) };
+    }
+    return { ok: false as const, error: errorText(`read failed: ${(e as Error).message}`) };
+  }
+}
+
+async function persistJourney(loomPath: string, j: LoomJourney) {
+  const schemaResult = await validateJourney(j);
+  if (!schemaResult.ok) {
+    return errorText("Validation failed:", schemaResult.errors);
+  }
+  const refErrors = await crossCheckJourney(loomPath, j);
+  if (refErrors.length > 0) {
+    return errorText("Validation failed:", refErrors);
+  }
+  await writeJourney(loomPath, j.id, j);
+  return null;
+}
+
+function uniqueStepId(j: LoomJourney): string {
+  const ids = new Set(j.steps.map((s) => s.id));
+  let i = j.steps.length + 1;
+  while (ids.has(`step-${i}`)) i++;
+  return `step-${i}`;
+}
+
+const journeyStepPatchSchema = z.object({
+  node: z.string().optional(),
+  title: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  code_refs: z.array(codeRefSchema).optional(),
+});
+
 export function createMcpServer(loomRoot: LoomRoot) {
   const server = new McpServer(
     { name: "loom-spec", version: "0.0.1" },
-    { instructions: `Use these tools to maintain the architecture spec in ${loomRoot.loomPath}. They edit .loom/diagrams/*.flow.json — prefer them over editing the JSON files directly because they validate against the schema before writing.` }
+    { instructions: `Use these tools to maintain the architecture spec in ${loomRoot.loomPath}. They edit .loom/diagrams/*.flow.json and .loom/journeys/*.journey.json — prefer them over editing the JSON files directly because they validate against the schema (and, for journeys, cross-check that referenced nodes exist) before writing.` }
   );
 
   server.registerTool(
@@ -322,6 +367,253 @@ export function createMcpServer(loomRoot: LoomRoot) {
       if (d.edges.length === before) return errorText(`edge '${id}' not found`);
       const err = await persist(loomRoot.loomPath, diagram, d);
       if (err) return err;
+      return jsonText({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "loom_list_journeys",
+    {
+      title: "List journeys",
+      description:
+        "List all journeys in the spec with title, target diagram, and step count.",
+      inputSchema: {},
+    },
+    async () => {
+      const summaries = await listJourneys(loomRoot.loomPath);
+      return jsonText(summaries);
+    }
+  );
+
+  server.registerTool(
+    "loom_read_journey",
+    {
+      title: "Read journey",
+      description: "Read a specific journey's full JSON by id.",
+      inputSchema: { id: z.string().describe("Journey id (e.g. 'checkout')") },
+    },
+    async ({ id }) => {
+      const r = await readJourneyOrError(loomRoot.loomPath, id);
+      if (!r.ok) return r.error;
+      return jsonText(r.journey);
+    }
+  );
+
+  server.registerTool(
+    "loom_create_journey",
+    {
+      title: "Create journey",
+      description:
+        "Create a new journey file. Fails if a journey with this id already exists, or if the referenced diagram doesn't exist.",
+      inputSchema: {
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .describe("Journey id (lowercase kebab). Becomes the filename."),
+        title: z.string().max(80),
+        diagram: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .describe("Id of the diagram this journey walks through."),
+        description: z.string().optional(),
+        steps: z
+          .array(
+            z.object({
+              id: z.string().regex(/^[a-z0-9-]+$/),
+              node: z.string().regex(/^[a-z0-9-]+$/),
+              title: z.string().max(80).optional(),
+              description: z.string().optional(),
+              code_refs: z.array(codeRefSchema).optional(),
+            })
+          )
+          .optional()
+          .describe("Optional initial steps. Each step.node must exist in the diagram."),
+      },
+    },
+    async ({ id, title, diagram, description, steps }) => {
+      // Refuse to overwrite. Use update tools to modify an existing journey.
+      const existing = await readJourneyOrError(loomRoot.loomPath, id);
+      if (existing.ok) {
+        return errorText(`journey '${id}' already exists`);
+      }
+      const journey: LoomJourney = {
+        version: "1",
+        id,
+        title,
+        description,
+        diagram,
+        steps: steps ?? [],
+      };
+      const err = await persistJourney(loomRoot.loomPath, journey);
+      if (err) return err;
+      return jsonText({ ok: true, id });
+    }
+  );
+
+  server.registerTool(
+    "loom_add_step",
+    {
+      title: "Add journey step",
+      description:
+        "Append (or insert) a step into a journey. The node must exist in the journey's diagram. If 'after' is omitted, the step is appended at the end.",
+      inputSchema: {
+        journey: z.string().describe("Journey id"),
+        node: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .describe("Id of a node in the journey's diagram"),
+        title: z.string().max(80).optional(),
+        description: z.string().optional(),
+        code_refs: z.array(codeRefSchema).optional(),
+        after: z
+          .string()
+          .optional()
+          .describe("Step id to insert after. Omit to append at the end."),
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .optional()
+          .describe("Optional explicit step id. If omitted, generated as step-<n>."),
+      },
+    },
+    async ({ journey, node, title, description, code_refs, after, id }) => {
+      const r = await readJourneyOrError(loomRoot.loomPath, journey);
+      if (!r.ok) return r.error;
+      const j = r.journey;
+      const stepId = id ?? uniqueStepId(j);
+      if (j.steps.some((s) => s.id === stepId)) {
+        return errorText(`step with id '${stepId}' already exists in journey '${journey}'`);
+      }
+      const step: JourneyStep = {
+        id: stepId,
+        node,
+        title,
+        description,
+        code_refs,
+      };
+      if (after !== undefined) {
+        const idx = j.steps.findIndex((s) => s.id === after);
+        if (idx < 0) return errorText(`step '${after}' not found in journey '${journey}'`);
+        j.steps.splice(idx + 1, 0, step);
+      } else {
+        j.steps.push(step);
+      }
+      const err = await persistJourney(loomRoot.loomPath, j);
+      if (err) return err;
+      return jsonText({ ok: true, id: stepId });
+    }
+  );
+
+  server.registerTool(
+    "loom_update_step",
+    {
+      title: "Update journey step",
+      description:
+        "Patch fields on an existing step. Only the fields you pass are changed. Pass null on a nullable field to clear it. If you change 'node', it must still exist in the journey's diagram.",
+      inputSchema: {
+        journey: z.string(),
+        id: z.string().describe("Step id"),
+        patch: journeyStepPatchSchema.describe("Fields to merge"),
+      },
+    },
+    async ({ journey, id, patch }) => {
+      const r = await readJourneyOrError(loomRoot.loomPath, journey);
+      if (!r.ok) return r.error;
+      const j = r.journey;
+      const idx = j.steps.findIndex((s) => s.id === id);
+      if (idx < 0) return errorText(`step '${id}' not found in journey '${journey}'`);
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null) continue;
+        if (v !== undefined) cleaned[k] = v;
+      }
+      if (patch.title === null) cleaned["title"] = undefined;
+      if (patch.description === null) cleaned["description"] = undefined;
+      j.steps[idx] = { ...j.steps[idx]!, ...cleaned } as JourneyStep;
+      const err = await persistJourney(loomRoot.loomPath, j);
+      if (err) return err;
+      return jsonText({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "loom_delete_step",
+    {
+      title: "Delete journey step",
+      description: "Remove a step from a journey by id. Subsequent steps keep their ids; only the array order changes.",
+      inputSchema: {
+        journey: z.string(),
+        id: z.string(),
+      },
+    },
+    async ({ journey, id }) => {
+      const r = await readJourneyOrError(loomRoot.loomPath, journey);
+      if (!r.ok) return r.error;
+      const j = r.journey;
+      const before = j.steps.length;
+      j.steps = j.steps.filter((s) => s.id !== id);
+      if (j.steps.length === before) {
+        return errorText(`step '${id}' not found in journey '${journey}'`);
+      }
+      const err = await persistJourney(loomRoot.loomPath, j);
+      if (err) return err;
+      return jsonText({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "loom_reorder_steps",
+    {
+      title: "Reorder journey steps",
+      description:
+        "Replace the step order with the given permutation. The 'order' array must contain exactly the existing step ids, each once.",
+      inputSchema: {
+        journey: z.string(),
+        order: z.array(z.string()).describe("Permutation of existing step ids"),
+      },
+    },
+    async ({ journey, order }) => {
+      const r = await readJourneyOrError(loomRoot.loomPath, journey);
+      if (!r.ok) return r.error;
+      const j = r.journey;
+      const existing = new Set(j.steps.map((s) => s.id));
+      if (order.length !== j.steps.length) {
+        return errorText(
+          `order length ${order.length} does not match step count ${j.steps.length}`
+        );
+      }
+      const seen = new Set<string>();
+      for (const id of order) {
+        if (!existing.has(id)) return errorText(`unknown step id '${id}'`);
+        if (seen.has(id)) return errorText(`duplicate step id '${id}' in order`);
+        seen.add(id);
+      }
+      const byId = new Map(j.steps.map((s) => [s.id, s] as const));
+      j.steps = order.map((id) => byId.get(id)!);
+      const err = await persistJourney(loomRoot.loomPath, j);
+      if (err) return err;
+      return jsonText({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "loom_delete_journey",
+    {
+      title: "Delete journey",
+      description:
+        "Hard-delete a journey file. Prefer renaming or editing in-place over deletion — journeys are documentation artefacts that often have value as history.",
+      inputSchema: {
+        id: z.string(),
+      },
+    },
+    async ({ id }) => {
+      const r = await readJourneyOrError(loomRoot.loomPath, id);
+      if (!r.ok) return r.error;
+      try {
+        await deleteJourney(loomRoot.loomPath, id);
+      } catch (e) {
+        return errorText(`delete failed: ${(e as Error).message}`);
+      }
       return jsonText({ ok: true });
     }
   );

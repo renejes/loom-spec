@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir, mkdir } from "node:fs/promises";
+import { readFile, writeFile, readdir, mkdir, unlink } from "node:fs/promises";
 import { resolve, basename } from "node:path";
 import type { LoomDiagram } from "../types/diagram.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
@@ -133,4 +133,14 @@ export async function writeJourney(
   const path = journeyFilePath(loomPath, id);
   await writeFile(path, serialized, "utf8");
   onWritten?.(path);
+}
+
+export async function deleteJourney(
+  loomPath: string,
+  id: string,
+  onDeleted?: (path: string) => void
+): Promise<void> {
+  const path = journeyFilePath(loomPath, id);
+  await unlink(path);
+  onDeleted?.(path);
 }

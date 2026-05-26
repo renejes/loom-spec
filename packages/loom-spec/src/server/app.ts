@@ -16,6 +16,7 @@ import {
   validateNodeTypes,
   validateJourney,
 } from "../validate.js";
+import { crossCheckJourney } from "./journeyCheck.js";
 import type { LoomJourney } from "../types/journey.js";
 import type { LoomRoot } from "./findLoomRoot.js";
 import type { LoomWatcher, LoomChangeEvent } from "./watch.js";
@@ -146,40 +147,14 @@ export function createApp({ loomRoot, watcher, serveSpaFrom }: AppOptions) {
       );
     }
 
-    // Referential integrity: the journey's diagram must exist, and every
-    // step.node must resolve to a node in that diagram.
-    let diagram;
+    let refErrors: string[];
     try {
-      diagram = await readDiagram(loomRoot.loomPath, journey.diagram);
+      refErrors = await crossCheckJourney(loomRoot.loomPath, journey);
     } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code;
-      if (code === "ENOENT") {
-        return c.json(
-          {
-            error: "validation failed",
-            details: [`/diagram: references unknown diagram "${journey.diagram}"`],
-          },
-          422
-        );
-      }
       return c.json({ error: (e as Error).message }, 500);
     }
-    const nodeIds = new Set(diagram.nodes.map((n) => n.id));
-    const stepErrors: string[] = [];
-    const seenStepIds = new Set<string>();
-    journey.steps.forEach((step, i) => {
-      if (seenStepIds.has(step.id)) {
-        stepErrors.push(`/steps/${i}/id: duplicate step id "${step.id}"`);
-      }
-      seenStepIds.add(step.id);
-      if (!nodeIds.has(step.node)) {
-        stepErrors.push(
-          `/steps/${i}/node: node "${step.node}" does not exist in diagram "${journey.diagram}"`
-        );
-      }
-    });
-    if (stepErrors.length > 0) {
-      return c.json({ error: "validation failed", details: stepErrors }, 422);
+    if (refErrors.length > 0) {
+      return c.json({ error: "validation failed", details: refErrors }, 422);
     }
 
     try {
