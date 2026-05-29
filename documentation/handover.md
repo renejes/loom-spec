@@ -1,4 +1,4 @@
-# Handover prompt — continue after v0.8.1 release
+# Handover prompt — continue after v0.9.0 release
 
 Copy everything in the fenced block below into a fresh Claude Code chat in the project root. It briefs the assistant on context, current state, conventions, and what's next.
 
@@ -7,13 +7,11 @@ Copy everything in the fenced block below into a fresh Claude Code chat in the p
 ````
 I'm continuing work on `loom-spec`, an open-source spec-as-code tool
 that keeps a node-based architecture spec inside the repo. You're
-picking up after v0.8.1 — a bug-fix release that actually delivers
-the Phase 7+8 features which v0.8.0 fumbled at publish time (stale
-`dist/` shipped to npm, see `done/phase-9-publish-fix.md`). The
-underlying features (signature drift, edge vocabulary) are
-correctly v0.8.0-vintage work — read those archives for the
-substance. Read the briefing below, then read the five docs in
-order, then propose what to do next.
+picking up after v0.9.0, which added JUCE / audio support:
+real-time-safety lint for C++ audio code, a C++ signature extractor,
+signal-typed edge coloring, and edge wiring validation. Read the
+briefing below, then read the five docs in order, then propose what
+to do next.
 
 ## What loom-spec is (30 seconds)
 
@@ -38,6 +36,38 @@ Standalone HTML export embeds the same viewer into manuals / wikis /
 docs sites with tag-based filtering for public vs internal, and
 `--from-journey` for focused walkthrough exports that open at the
 journey by default.
+
+## What v0.9.0 changed (critical context)
+
+v0.9.0 added Phase 10 — JUCE / audio support, driven by the author
+starting to build audio plugins with AI-written C++. Priority was
+RT-safety, then signal flow, then wiring.
+
+- **RT-safety lint**: a code_ref can be marked `realtime: true`. On
+  `loom-spec validate`, the referenced C/C++ function *body* is scanned
+  for audio-thread hazards (heap alloc, blocking locks, juce::String,
+  logging, file I/O, throw/dynamic_cast). Whitelisted: atomics,
+  SmoothedValue, ScopedNoDenormals, non-blocking try-locks. The scan
+  is **function-body-scoped** — the design hinge. (Real example: a
+  blocking SpinLock in `EQProcessor::getBand` must NOT be flagged
+  because getBand is a GUI method; only the `process()` method is
+  marked realtime, and it uses a try-lock. A whole-file scan would
+  false-positive; the body-scoped scan reports clean.)
+- **C++ signature extractor** (`signatures/cpp.ts`): signature drift
+  now works on `.cpp/.cc/.cxx/.c/.h/.hpp/.hh/.hxx`. Also provides the
+  function-body extraction the RT lint needs.
+- **Signal-typed edge coloring**: edges between matching typed ports
+  (audio/midi/cv) are colored by signal in the viewer.
+- **Edge wiring validation**: port existence (error), endpoint node
+  existence (error), signal compatibility across the edge (warning).
+
+The real channelstrip JUCE plugin was bootstrapped with a `.loom/`
+(in the separate channelstrip repo) and validates clean. See
+`done/phase-10-juce-rt-safety.md` and the user-facing `audio-dsp.md`.
+
+Design note repeated from Phase 7: regex + state-machine extractors,
+no tree-sitter. C++ is the hardest but the body-scoping + comment/
+string masking keeps precision high.
 
 ## What v0.8.0 changed (critical context)
 
@@ -133,7 +163,7 @@ Deliberate non-additions in this phase:
 
 ## Where it stands right now
 
-- **`loom-spec@0.8.1`** is the latest on npm. (v0.8.0 was broken on publish — Phase 9.)
+- **`loom-spec@0.9.0`** is the latest on npm.
 - Real-world adoption confirmed (the author uses it on a separate
   project; the diagram editor + MCP tools + drift detection + export
   + signature-fingerprint workflow all see real use. Journey use is
@@ -247,9 +277,13 @@ based on real pain, or wait for it. Top candidates:
     extractor units + e2e capture/drift/recapture across 4 languages)
   - `packages/loom-spec/scripts/smoke-edge-vocab.ts` (11 assertions,
     edge property validation unit + e2e)
-  All five clean up byte-for-byte. Run them after changes that touch
-  the export pipeline, the MCP server, the signatures module, or the
-  edge-property validator.
+  - `packages/loom-spec/scripts/smoke-rt-safety.ts` (20 assertions,
+    C++ extractor + RT-safety lint unit + e2e)
+  - `packages/loom-spec/scripts/smoke-port-wiring.ts` (8 assertions,
+    edge wiring validation)
+  All seven clean up byte-for-byte. Run them after changes that touch
+  the export pipeline, the MCP server, the signatures module, the
+  validators, or the drift check.
 - npm publishing: account has `auth-and-writes` 2FA. The reliable
   flow is `npm logout && npm login` (browser passkey) then
   `npm publish` (interactive OTP). If the token in `~/.npmrc` ever

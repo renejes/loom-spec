@@ -17,9 +17,11 @@ It is **a spec layer, not an execution layer**. The nodes don't run — they des
 
 ## Current state
 
-**v0.8.1 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project).
+**v0.9.0 published on npm** ([npmjs.com/package/loom-spec](https://www.npmjs.com/package/loom-spec)). Real-world use confirmed (the author's day-to-day project + a JUCE audio plugin).
 
-v0.8.1 is a bug-fix release ([Phase 9](./done/phase-9-publish-fix.md)) — v0.8.0 shipped with a stale `dist/` directory, so the Phase 7 (signature drift) and Phase 8 (edge vocabulary) modules weren't actually in the published tarball. The features themselves were correct, but the build wasn't run before publish. Added a `prepublishOnly` hook plus a `check-dist` manifest verifier so no future publish can ship without the expected files. Use v0.8.1, not v0.8.0.
+v0.9.0 adds **JUCE / audio support** ([Phase 10](./done/phase-10-juce-rt-safety.md)): a **real-time-safety lint** that scans `realtime`-marked C++ function bodies for audio-thread hazards (heap allocation, blocking locks, juce::String, logging, file I/O) — function-body-scoped so a lock in a sibling GUI method doesn't false-positive; a **C++ signature extractor** (signature drift now works on `.cpp/.h`); **signal-typed edge coloring** (audio/midi/cv visually distinct); and **edge wiring validation** (port existence + signal compatibility). The real channelstrip plugin was bootstrapped with a `.loom/` and validates clean.
+
+v0.8.1 was a bug-fix release ([Phase 9](./done/phase-9-publish-fix.md)) — v0.8.0 shipped with a stale `dist/`, so the Phase 7+8 modules weren't in the published tarball. Added a `prepublishOnly` hook + `check-dist` verifier so no future publish ships a stale build.
 
 v0.8.0 adds two related features:
 
@@ -43,10 +45,11 @@ For per-version detail of what shipped when, see [`done/`](./done/):
 - [Phase 7 — Signature-drift detection](./done/phase-7-signature-drift.md) (v0.8.0)
 - [Phase 8 — Edge property vocabulary](./done/phase-8-edge-vocabulary.md) (v0.8.0)
 - [Phase 9 — Publish hygiene fix](./done/phase-9-publish-fix.md) (v0.8.1)
+- [Phase 10 — JUCE / audio: RT-safety, C++ signatures, signal flow](./done/phase-10-juce-rt-safety.md) (v0.9.0)
 
 ## Capabilities at a glance
 
-| Layer | What works as of v0.8.0 |
+| Layer | What works as of v0.9.0 |
 |---|---|
 | Data | 3 schema-validated file kinds (diagrams, node-types, journeys) + optional `.loom/exports.json` for named bundles. Edges carry an optional free-form `properties` object — optionally constrained by `edge_types` declarations in `node-types.json` (typed vocabulary, validate warns on undeclared keys / wrong types / bad enums). Code-refs carry an optional `signature_hint` (filled by `validate --capture`) for drift detection. |
 | CLI | `init [--mcp]`, `install-mcp`, `view`, `validate [--capture | --recapture]`, `mcp`, `export-html` (with `--from-journey`). |
@@ -55,7 +58,8 @@ For per-version detail of what shipped when, see [`done/`](./done/):
 | Journey viewer | Read-only step navigator (prev/next, keyboard ←/→/Home/End), current node glows, prior steps subtly highlighted, non-journey nodes dimmed to ~28% opacity, edge between consecutive steps pulses, collapsible step sidebar with code-refs. |
 | Live sync | chokidar watcher with self-write suppression; SSE for both diagram and journey changes; UI refetches on external edits. |
 | Agent skill | `.claude/skills/loom-spec/SKILL.md` with 7 worked examples (incl. journey authoring) + tagging hygiene + workflow-vs-tags decision rule + granularity patterns ("how many nodes per file") + security warnings. |
-| Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Three checks: existence (file + symbol + line range), signature drift (canonical declaration line, language-aware for Python/TS/JSX/Rust/Svelte), and edge property vocabulary (if `edge_types` declared in node-types). Exits non-zero on schema errors, broken refs, signature drift, and edge-property issues; `signature-missing` is informational. |
+| Drift detection | `loom-spec validate` walks all `code_refs[]` on nodes *and* journey steps. Checks: existence (file + symbol + line range), signature drift (Python/TS/JSX/Rust/Svelte/C++), edge property vocabulary (if `edge_types` declared), real-time safety (C/C++ `realtime` refs — heap/lock/string/logging/IO in the audio thread), and edge wiring (port existence + signal compatibility). Exits non-zero on schema errors, broken refs, signature drift, edge-property issues, rt-unsafe findings, and wiring errors. |
+| Audio / DSP | Typed ports (`signal: audio/midi/cv`), signal-typed edge coloring in the viewer, `realtime` code_refs for RT-safety lint. See [`audio-dsp.md`](./audio-dsp.md). |
 | Export | Standalone interactive HTML; tag-based filter with cascade rules (drop edges to dropped nodes, shrink groups, clear drill-downs); named bundles via `.loom/exports.json`; `--diagram <id>` for single-diagram exports; `--include-tag` / `--exclude-tag`; `--from-journey <id>` for focused walkthrough exports with `defaultView` hint. |
 
 ## Architecture
@@ -175,8 +179,11 @@ End-to-end checks that currently pass (via `pnpm --filter loom-spec typecheck` p
 - **MCP-diagrams smoke** (`scripts/smoke-mcp-diagrams.ts`, 13 assertions) — covers the v0.7.0 additions: auto-layout placement, edge `properties` round-trip, `loom_update_edge` patch semantics.
 - **Signatures smoke** (`scripts/smoke-signatures.ts`, 30 assertions) — 16 extractor unit checks (Python/TS/Rust/Svelte canonical shapes incl. generics, lifetimes, async, modifiers, multi-line) + 14 end-to-end (write source in 4 languages, capture hints, mutate a signature, detect drift, recapture acknowledges new baseline).
 - **Edge-vocab smoke** (`scripts/smoke-edge-vocab.ts`, 11 assertions) — unit checks for each failure mode (unknown key / wrong type / bad enum / out-of-range / required-missing) plus end-to-end via `runDriftCheck`.
+- **RT-safety smoke** (`scripts/smoke-rt-safety.ts`, 20 assertions) — C++ extractor units + scanRtSafety (clean whitelist pass, every dirty pattern, comment/string masking) + e2e (clean vs dirty process, sibling GUI method not scanned).
+- **Port-wiring smoke** (`scripts/smoke-port-wiring.ts`, 8 assertions) — unknown node/port, signal mismatch warning, clean audio chain, e2e counters.
 - Production build path: `node dist/cli/index.js view` serves SPA + API on one port without Vite. Plus `dist/view-export/` (single chunk) for the standalone HTML embed.
-- npm-installed flow via the published `loom-spec@0.8.1` (v0.8.0 shipped broken; see Phase 9).
+- npm-installed flow via the published `loom-spec@0.9.0`.
+- Real-world JUCE validation: the channelstrip plugin's `.loom/` validates clean (RT-safety + wiring) against actual C++ DSP code.
 - `prepublishOnly` + `check-dist` script guarantee that future publishes can't ship a stale `dist/`.
 - Real-world use: the author's day-to-day project uses the diagram editor + MCP tools + drift validation + HTML export.
 

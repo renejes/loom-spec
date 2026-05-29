@@ -1,6 +1,6 @@
 {
   "name": "loom-spec",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Node-based architecture spec that lives in your repo. AI-readable, AI-writable, git-diffable.",
   "type": "module",
   "author": "René Jesser",

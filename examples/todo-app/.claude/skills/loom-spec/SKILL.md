@@ -80,8 +80,8 @@ The lifecycle:
    step in the spec-author commit, not in CI).
 
 The check is only as good as the language parsers. Python, TypeScript
-(incl. JSX), Rust, and Svelte are supported as of v0.8.0. Other
-extensions skip the check silently — the existence check still runs.
+(incl. JSX), Rust, Svelte (v0.8.0) and C/C++ (v0.9.0) are supported.
+Other extensions skip the check silently — the existence check still runs.
 
 ### When deleting code
 
@@ -195,6 +195,64 @@ When the user wants to add a new edge attribute to the vocabulary:
 edit `node-types.json` to add the field declaration first, then update
 the edges. Agents should default to **adding to the vocabulary, not
 inventing keys** — that's the whole point of the mechanism.
+
+### Audio / DSP graphs and real-time safety (JUCE, C++)
+
+For audio plugins and other real-time systems, loom-spec models the
+signal flow with **typed ports** and checks **real-time safety**.
+
+**Typed ports.** Declare ports with a `signal` type in `node-types.json`:
+
+```json
+"dsp": {
+  "label": "DSP Module", "color": "#34d399", "icon": "sliders",
+  "ports": {
+    "in":  [{ "name": "in", "signal": "audio" }, { "name": "cutoff", "signal": "cv" }],
+    "out": [{ "name": "out", "signal": "audio" }]
+  }
+}
+```
+
+Wire edges with the `node:port` syntax (`from: "eq:out"`, `to: "comp:in"`).
+`loom-spec validate` then checks:
+- the port exists on the node's type (typo → error)
+- the endpoint nodes exist (dangling edge → error)
+- signal types match across the connection (audio→midi → warning)
+
+In the viewer, edges between matching typed ports are colored by signal
+(audio / midi / cv visually distinct).
+
+**Real-time safety.** Mark a code_ref that runs on the audio thread
+(`processBlock`, a DSP `process()` method) with `realtime: true`:
+
+```json
+{ "id": "eq", "type": "dsp", "label": "EQ",
+  "code_refs": [
+    { "path": "Source/DSP/EQProcessor.cpp", "symbol": "EQProcessor::process", "realtime": true },
+    { "path": "Source/DSP/EQProcessor.cpp", "symbol": "EQProcessor::getBand" }
+  ] }
+```
+
+`loom-spec validate` scans the **body of the realtime symbol only**
+(C/C++ for now) and flags RT-unsafe patterns: heap allocation
+(`new`/`delete`/`malloc`/`.resize`/`.push_back`/`make_unique`), blocking
+locks (`ScopedLock`/`lock_guard`/`.lock()`), `juce::String` construction,
+logging (`DBG`/`std::cout`), file I/O, `throw`/`dynamic_cast`. Whitelisted
+(NOT flagged): atomics, `SmoothedValue`, `ScopedNoDenormals`, non-blocking
+try-locks (`ScopedTryLockType`/`try_lock`).
+
+Because the scan is **function-body-scoped**, a lock in a sibling GUI
+method (e.g. `getBand`, not marked realtime) is correctly ignored —
+only the audio-thread method is checked.
+
+**When you (the agent) write or refactor audio code:**
+- Put `realtime: true` on the code_ref for any `processBlock` / DSP
+  `process()` you add to the spec.
+- After writing, run `loom_validate` — if it reports `rt-unsafe`, you
+  introduced a real audio-thread bug. Move the allocation/lock/logging
+  out of the hot path (to `prepareToPlay` or the message thread).
+- Don't suppress an rt-unsafe finding by removing `realtime: true` —
+  fix the code. The marker is the whole point.
 
 ### Tagging hygiene for exports
 

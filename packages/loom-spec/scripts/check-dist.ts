@@ -49,8 +49,10 @@ const CHECKS: FileCheck[] = [
       "extractSignature",
       "captureMode",
       "validateEdgeProperties",
+      "rt-unsafe",
+      "checkRtSafetyRef",
     ],
-    phase: "Phase 7+8 (v0.8.0)",
+    phase: "Phase 7+8+10 (v0.8.0/v0.9.0)",
   },
   {
     path: "cli/validate.js",
@@ -59,6 +61,9 @@ const CHECKS: FileCheck[] = [
   },
   // Phase 8 — Edge vocabulary
   { path: "server/edgeValidate.js", phase: "Phase 8 (v0.8.0)" },
+  // Phase 10 — JUCE / RT-safety
+  { path: "server/signatures/cpp.js", phase: "Phase 10 (v0.9.0)" },
+  { path: "server/rtSafety.js", phase: "Phase 10 (v0.9.0)" },
 ];
 
 async function main() {

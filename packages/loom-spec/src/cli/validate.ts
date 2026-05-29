@@ -31,6 +31,8 @@ function formatIssue(detail: string | undefined, issue: string): string {
       return `signature drift\n      ${detail}`;
     case "signature-missing":
       return `no signature hint captured yet (run with --capture)`;
+    case "rt-unsafe":
+      return `RT-unsafe: ${detail ?? "audio-thread violation"}`;
     default:
       return issue;
   }
@@ -63,10 +65,15 @@ function printDiagram(d: DiagramReport): void {
   for (const f of d.edgeIssues) {
     console.log(`  ${ICON_BAD} edge ${f.edgeId}: ${f.detail}`);
   }
+  for (const f of d.wiringIssues) {
+    const icon = f.severity === "error" ? ICON_BAD : ICON_WARN;
+    console.log(`  ${icon} edge ${f.edgeId}: ${f.detail}`);
+  }
   if (
     d.schemaErrors.length === 0 &&
     d.drift.length === 0 &&
-    d.edgeIssues.length === 0
+    d.edgeIssues.length === 0 &&
+    d.wiringIssues.length === 0
   ) {
     console.log(`  ${ICON_INFO} no issues`);
   }
@@ -138,6 +145,15 @@ export async function runValidate(args: ValidateArgs): Promise<void> {
   if (report.totalEdgeIssues > 0) {
     summary.push(`${report.totalEdgeIssues} edge property issue(s)`);
   }
+  if (report.totalRtUnsafe > 0) {
+    summary.push(`${report.totalRtUnsafe} real-time safety issue(s)`);
+  }
+  if (report.totalWiringErrors > 0) {
+    summary.push(`${report.totalWiringErrors} edge wiring error(s)`);
+  }
+  if (report.totalWiringWarnings > 0) {
+    summary.push(`${report.totalWiringWarnings} signal mismatch warning(s)`);
+  }
   if (report.totalSignatureMissing > 0) {
     summary.push(
       `${report.totalSignatureMissing} ref(s) without a signature hint (informational)`
@@ -149,7 +165,11 @@ export async function runValidate(args: ValidateArgs): Promise<void> {
 
   const docCount = report.perDiagram.length + report.perJourney.length;
   const failCount =
-    report.totalDrift + report.totalSchemaErrors + report.totalEdgeIssues;
+    report.totalDrift +
+    report.totalSchemaErrors +
+    report.totalEdgeIssues +
+    report.totalRtUnsafe +
+    report.totalWiringErrors;
   if (failCount === 0) {
     const tail = summary.length > 0 ? ` (${summary.join(", ")})` : "";
     console.log(`${ICON_OK} All ${docCount} document(s) clean${tail}.`);

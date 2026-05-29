@@ -19,6 +19,7 @@ import { extractPythonSignature } from "./python.js";
 import { extractTypeScriptSignature } from "./typescript.js";
 import { extractRustSignature } from "./rust.js";
 import { extractSvelteSignature } from "./svelte.js";
+import { extractCppSignature } from "./cpp.js";
 
 export type SignatureExtractor = (
   source: string,
@@ -35,7 +36,33 @@ const EXTENSIONS: Record<string, SignatureExtractor> = {
   ".cjs": extractTypeScriptSignature,
   ".rs": extractRustSignature,
   ".svelte": extractSvelteSignature,
+  ".cpp": extractCppSignature,
+  ".cc": extractCppSignature,
+  ".cxx": extractCppSignature,
+  ".c": extractCppSignature,
+  ".h": extractCppSignature,
+  ".hpp": extractCppSignature,
+  ".hh": extractCppSignature,
+  ".hxx": extractCppSignature,
 };
+
+const CPP_EXTENSIONS = new Set([
+  ".cpp",
+  ".cc",
+  ".cxx",
+  ".c",
+  ".h",
+  ".hpp",
+  ".hh",
+  ".hxx",
+]);
+
+/** True if the file extension is a C/C++ source/header we can body-scan. */
+export function isCppPath(filePath: string): boolean {
+  const dot = filePath.lastIndexOf(".");
+  if (dot < 0) return false;
+  return CPP_EXTENSIONS.has(filePath.slice(dot).toLowerCase());
+}
 
 /**
  * Returns the canonical signature for `symbol` in `source`, or null if

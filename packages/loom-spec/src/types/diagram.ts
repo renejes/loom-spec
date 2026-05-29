@@ -72,6 +72,10 @@ export interface CodeRef {
    * Canonical signature line captured from the symbol's source. Filled by `loom-spec validate --capture`. Drift detection compares this against the current source; mismatch = warning. Lets agents catch semantic refactors (e.g. parameter type changes) that the existence check alone misses.
    */
   signature_hint?: string;
+  /**
+   * Marks this code_ref as running on a real-time / audio thread (e.g. a JUCE processBlock or DSP process method). `loom-spec validate` scans the referenced symbol's body — C++/C only for now — for RT-unsafe patterns (heap allocation, blocking locks, juce::String, logging, file I/O, exceptions) and reports them as errors. Non-blocking try-locks, atomics, SmoothedValue, and ScopedNoDenormals are whitelisted. The scan is function-body-scoped, so locks/allocations in sibling GUI methods don't false-positive.
+   */
+  realtime?: boolean;
 }
 export interface Edge {
   id: string;

@@ -61,4 +61,8 @@ export interface CodeRef {
    * Canonical signature line captured from the symbol's source. Filled by `loom-spec validate --capture`. Drift detection compares this against the current source; mismatch = warning.
    */
   signature_hint?: string;
+  /**
+   * Marks this code_ref as running on a real-time / audio thread. `loom-spec validate` scans the referenced symbol's body (C++/C only) for RT-unsafe patterns and reports them as errors.
+   */
+  realtime?: boolean;
 }

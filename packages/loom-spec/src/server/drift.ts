@@ -14,12 +14,16 @@ import {
   extractSignature,
   canonicalize,
   isSupportedExtension,
+  isCppPath,
 } from "./signatures/index.js";
+import { extractCppFunction } from "./signatures/cpp.js";
+import { scanRtSafety } from "./rtSafety.js";
 import {
   validateEdgeProperties,
   formatEdgePropertyIssue,
   type EdgePropertyIssue,
 } from "./edgeValidate.js";
+import { validateEdgeWiring, type WiringFinding } from "./portValidate.js";
 import type { LoomDiagram, CodeRef } from "../types/diagram.js";
 import type { LoomJourney } from "../types/journey.js";
 import type { LoomNodeTypes } from "../types/node-types.js";
@@ -30,7 +34,8 @@ export type DriftIssue =
   | "lines-out-of-range"
   | "invalid-lines"
   | "signature-drift"
-  | "signature-missing";
+  | "signature-missing"
+  | "rt-unsafe";
 
 export interface DriftFinding {
   diagramId: string;
@@ -67,6 +72,7 @@ export interface DiagramReport {
   staleNodes: number;
   drift: DriftFinding[];
   edgeIssues: EdgeIssueFinding[];
+  wiringIssues: WiringFinding[];
   schemaErrors: string[];
 }
 
@@ -90,6 +96,13 @@ export interface DriftReport {
   /** Edge property violations against the declared edge_types vocabulary.
    *  Sums into the exit-code criterion alongside totalDrift. */
   totalEdgeIssues: number;
+  /** RT-safety violations on code_refs marked realtime. Counts toward
+   *  the exit code — these are real audio-thread bugs. */
+  totalRtUnsafe: number;
+  /** Edge wiring errors (unknown node/port). Counts toward the exit code. */
+  totalWiringErrors: number;
+  /** Edge wiring warnings (signal mismatch). Informational, doesn't fail CI. */
+  totalWiringWarnings: number;
   totalSchemaErrors: number;
   /** When capture mode is on, count of refs whose hint was written/updated. */
   capturedCount: number;
@@ -217,6 +230,31 @@ async function checkRef(
   return { finding: null, fileReadable: true };
 }
 
+/**
+ * Scan a realtime-marked code_ref for RT-unsafe patterns. C/C++ only —
+ * other languages return [] (the marker is harmless but inert). Reads
+ * the file, extracts the function body, scans only within it.
+ */
+async function checkRtSafetyRef(
+  rootPath: string,
+  ref: CodeRef
+): Promise<Array<{ issue: "rt-unsafe"; detail: string }>> {
+  if (!ref.realtime || !ref.symbol || !isCppPath(ref.path)) return [];
+  const abs = resolve(rootPath, ref.path);
+  let src: string;
+  try {
+    src = await readFile(abs, "utf8");
+  } catch {
+    return [];
+  }
+  const fn = extractCppFunction(src, ref.symbol);
+  if (!fn) return [];
+  return scanRtSafety(fn.body, fn.bodyStartOffset, src).map((f) => ({
+    issue: "rt-unsafe" as const,
+    detail: `${f.label} — line ${f.line}: ${f.snippet}`,
+  }));
+}
+
 interface MutationPlan {
   diagramWrites: Map<string, LoomDiagram>;
   journeyWrites: Map<string, LoomJourney>;
@@ -263,6 +301,9 @@ export async function runDriftCheck(
   let totalDrift = 0;
   let totalSignatureMissing = 0;
   let totalEdgeIssues = 0;
+  let totalRtUnsafe = 0;
+  let totalWiringErrors = 0;
+  let totalWiringWarnings = 0;
   let totalSchemaErrors = 0;
   let capturedCount = 0;
 
@@ -285,6 +326,7 @@ export async function runDriftCheck(
         staleNodes: 0,
         drift: [],
         edgeIssues: [],
+        wiringIssues: [],
         schemaErrors: [`failed to read: ${(e as Error).message}`],
       });
       totalSchemaErrors++;
@@ -331,6 +373,19 @@ export async function runDriftCheck(
           diagramMutated = true;
           capturedCount++;
         }
+        // RT-safety scan for realtime-marked refs (C/C++ only).
+        const rtFindings = await checkRtSafetyRef(rootPath, ref);
+        for (const rt of rtFindings) {
+          drift.push({
+            diagramId: s.id,
+            nodeId: node.id,
+            refIndex: i,
+            ref,
+            issue: rt.issue,
+            detail: rt.detail,
+          });
+          totalRtUnsafe++;
+        }
       }
     }
 
@@ -356,6 +411,18 @@ export async function runDriftCheck(
       }
     }
 
+    // Edge wiring check (node/port existence + signal compatibility).
+    const wiringIssues: WiringFinding[] = [];
+    if (nodeTypes) {
+      for (const edge of diagram.edges) {
+        for (const f of validateEdgeWiring(edge, diagram, nodeTypes)) {
+          wiringIssues.push(f);
+          if (f.severity === "error") totalWiringErrors++;
+          else totalWiringWarnings++;
+        }
+      }
+    }
+
     perDiagram.push({
       diagramId: s.id,
       title: s.title,
@@ -365,6 +432,7 @@ export async function runDriftCheck(
       staleNodes,
       drift,
       edgeIssues,
+      wiringIssues,
       schemaErrors,
     });
   }
@@ -422,6 +490,18 @@ export async function runDriftCheck(
           journeyMutated = true;
           capturedCount++;
         }
+        const rtFindings = await checkRtSafetyRef(rootPath, ref);
+        for (const rt of rtFindings) {
+          drift.push({
+            journeyId: s.id,
+            stepId: step.id,
+            refIndex: i,
+            ref,
+            issue: rt.issue,
+            detail: rt.detail,
+          });
+          totalRtUnsafe++;
+        }
       }
     }
 
@@ -454,6 +534,9 @@ export async function runDriftCheck(
     totalDrift,
     totalSignatureMissing,
     totalEdgeIssues,
+    totalRtUnsafe,
+    totalWiringErrors,
+    totalWiringWarnings,
     totalSchemaErrors,
     capturedCount,
   };

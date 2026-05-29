@@ -31,6 +31,19 @@ const EDGE_COLOR: Record<LoomEdge["kind"], string> = {
   control: "var(--edge-control)",
 };
 
+// Signal-type → edge color, for audio/DSP graphs. When both endpoints of
+// an edge reference typed ports with the same signal, the edge is colored
+// by signal instead of by kind — so audio / midi / cv paths are visually
+// distinct at a glance. Mirrors the port-handle colors in NodeCard.
+const SIGNAL_EDGE_COLOR: Record<string, string> = {
+  audio: "#f472b6",
+  midi: "#a78bfa",
+  control: "#34d399",
+  cv: "#34d399",
+  http: "#60a5fa",
+  data: "#fbbf24",
+};
+
 const nodeTypes = { loom: NodeCard, loomGroup: GroupNode };
 const edgeTypes = { parallel: ParallelEdge, pulse: PulseEdge };
 
@@ -70,6 +83,38 @@ function splitHandle(handle: string): { node: string; port: string | null } {
   const i = handle.indexOf(":");
   if (i === -1) return { node: handle, port: null };
   return { node: handle.slice(0, i), port: handle.slice(i + 1) };
+}
+
+/** Look up the declared signal type of a node's port, or null. */
+function portSignal(
+  handle: string,
+  dir: "in" | "out",
+  diagram: LoomDiagram,
+  nodeTypesConfig: LoomNodeTypes
+): string | null {
+  const { node, port } = splitHandle(handle);
+  if (!port) return null;
+  const n = diagram.nodes.find((x) => x.id === node);
+  if (!n) return null;
+  const ports = dir === "in"
+    ? nodeTypesConfig.types[n.type]?.ports?.in
+    : nodeTypesConfig.types[n.type]?.ports?.out;
+  return ports?.find((p) => p.name === port)?.signal ?? null;
+}
+
+/** Color an edge by signal type when both endpoints are typed ports with
+ *  the same signal (audio/midi/cv). Returns null to fall back to kind color. */
+function resolveSignalColor(
+  edge: LoomEdge,
+  diagram: LoomDiagram,
+  nodeTypesConfig: LoomNodeTypes
+): string | null {
+  const fromSig = portSignal(edge.from, "out", diagram, nodeTypesConfig);
+  const toSig = portSignal(edge.to, "in", diagram, nodeTypesConfig);
+  if (fromSig && toSig && fromSig === toSig) {
+    return SIGNAL_EDGE_COLOR[fromSig] ?? null;
+  }
+  return null;
 }
 
 export function DiagramCanvas({
@@ -176,7 +221,10 @@ export function DiagramCanvas({
         label: e.label,
         selected: selection?.kind === "edge" && selection.id === e.id,
         selectable: interactive,
-        style: { stroke: EDGE_COLOR[e.kind], strokeWidth: 1.5 },
+        style: {
+          stroke: resolveSignalColor(e, diagram, nodeTypesConfig) ?? EDGE_COLOR[e.kind],
+          strokeWidth: 1.5,
+        },
         labelStyle: { fill: "var(--text-muted)", fontSize: 11 },
         labelBgStyle: { fill: "var(--bg-elevated)" },
         labelBgPadding: [4, 2] as [number, number],
@@ -187,7 +235,7 @@ export function DiagramCanvas({
         data: { parallelOffset: isParallel ? offsetIndex : 0, pulsing },
       };
     });
-  }, [diagram, selection, interactive, pulsingEdgeIds]);
+  }, [diagram, nodeTypesConfig, selection, interactive, pulsingEdgeIds]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
