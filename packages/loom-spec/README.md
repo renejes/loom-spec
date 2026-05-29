@@ -12,7 +12,16 @@ It's a spec layer, not an execution layer. The nodes describe; they don't run.
 - **Agents losing the forest for the trees.** An agent grepping through `src/` doesn't see the system. Every session rebuilds the mental model from scratch.
 - **The mental-model gap.** People who think in signal flow but don't read code well get cut out.
 
-`loom-spec` is one canonical, machine-readable file-set under `.loom/` that says what exists and how it connects. Humans edit it visually. The agent reads it before implementing and updates it when code changes. `code_refs` anchor each node to actual source, so [`loom-spec validate`](#loom-spec-validate---root-dir---json) catches drift instead of letting it accumulate.
+`loom-spec` is one canonical, machine-readable file-set under `.loom/` that says what exists and how it connects. Humans edit it visually. The agent reads it before implementing and updates it when code changes. `code_refs` anchor each node to actual source, so [`loom-spec validate`](#commands) catches drift instead of letting it accumulate.
+
+## Highlights
+
+- **Browser editor** with live sync, custom node types, group frames, drill-down sub-diagrams.
+- **MCP server** — 19 semantic tools for agents (diagrams + journeys), all schema-validated before write.
+- **Drift detection** — code-ref existence, **signature drift** (Python / TypeScript / Rust / Svelte / C++), and **edge wiring** checks.
+- **Real-time-safety lint** for audio plugins (JUCE / C++) — see [Audio / DSP](#audio--dsp-real-time-safety).
+- **Journeys** — ordered guided walkthroughs of an architecture; see [Journeys](#journeys).
+- **Standalone HTML export** — one self-contained interactive file, tag-filtered, with `--from-journey` tour mode.
 
 ## Install + first run
 
@@ -56,12 +65,15 @@ npm install --save-dev loom-spec
 └── diagrams/
     └── overview.flow.json   { nodes, edges, groups }
 
+.loom/journeys/              (optional) ordered walkthroughs of a diagram
+.loom/exports.json           (optional) named HTML-export bundles
+
 .claude/
 └── skills/
     └── loom-spec/
-        └── SKILL.md         Tells Claude Code (or any Agent-Skills-aware tool)
-                             when and how to maintain the spec, with five
-                             worked examples.
+        ├── SKILL.md         Core: when/how to maintain the spec (Agent Skills standard).
+        └── reference/       Loaded on demand: examples, validation, audio-dsp,
+                             exports, journeys.
 
 .mcp.json                    Registers the MCP server, if you ran init --mcp.
 ```
@@ -101,9 +113,15 @@ In the editor you can:
 
 External edits to the JSON files (e.g. by an AI agent) propagate to the open UI live via Server-Sent Events — no reload needed.
 
-### `loom-spec validate [--root <dir>] [--json]`
+### `loom-spec validate [--root <dir>] [--json] [--capture | --recapture]`
 
-Checks every diagram for schema validity plus **code-ref drift**: missing files, missing symbols, out-of-range line ranges. Skips nodes marked `planned` or `deprecated` (their code may legitimately not exist). Exit code is non-zero if any issue is found — useful as a CI step or pre-commit hook.
+Checks every diagram **and journey** for schema validity plus drift. Skips nodes marked `planned` or `deprecated` (their code may legitimately not exist). Exit code is non-zero on errors — useful as a CI step or pre-commit hook. Checks:
+
+- **Code-ref existence** — missing files, missing symbols, out-of-range line ranges.
+- **Signature drift** — compares a captured `signature_hint` against the current source; flags when a function's contract changed even though the symbol still exists. Languages: Python, TypeScript (incl. JSX/JS), Rust, Svelte, C/C++. Others skip silently.
+- **Real-time safety** — for `code_refs` marked `realtime: true` (C/C++); see [Audio / DSP](#audio--dsp-real-time-safety).
+- **Edge wiring** — endpoint nodes exist, `node:port` references a declared port, signal types are compatible.
+- **Edge-property vocabulary** — if `edge_types` is declared in `node-types.json`.
 
 ```bash
 loom-spec validate
@@ -111,6 +129,8 @@ loom-spec validate
 #   5 nodes, 5 edges, 3 code refs checked
 #   ✗ todo-api → src/server/routes/todos.ts#todoRouter: symbol 'todoRouter' not found
 ```
+
+`--capture` fills missing `signature_hint`s from current source (writes back to JSON); run once after adding code_refs so future drift is detectable. `--recapture` overwrites all hints — the "current state is the new baseline" gesture after an intentional refactor. Don't run capture in CI (it masks drift); use read-only `validate` there.
 
 ### `loom-spec mcp [--root <dir>]`
 
@@ -129,12 +149,30 @@ Starts a **Model Context Protocol** server on stdio. Wire it into Claude Code (o
 
 If you'd rather not hand-edit, `npx loom-spec install-mcp` writes this entry into `.mcp.json` for you (merging with any existing servers, idempotent).
 
-The server exposes semantic tools that validate against the schema before writing, more token-efficient than re-reading and re-writing the JSON on every change:
+The server exposes 19 semantic tools that validate against the schema before writing, more token-efficient than re-reading and re-writing the JSON on every change:
 
+Diagrams:
 - `loom_list_diagrams`, `loom_read_diagram`, `loom_read_node_types`
 - `loom_add_node`, `loom_update_node`, `loom_mark_stale`, `loom_delete_node`
-- `loom_add_edge`, `loom_delete_edge`
-- `loom_validate` (same drift check as the CLI)
+- `loom_add_edge`, `loom_update_edge`, `loom_delete_edge`
+- `loom_validate` (same drift + RT-safety + wiring check as the CLI; pass `{ capture: "capture" | "recapture" }` to manage signature baselines)
+
+Journeys:
+- `loom_list_journeys`, `loom_read_journey`
+- `loom_create_journey`, `loom_add_step`, `loom_update_step`, `loom_delete_step`, `loom_reorder_steps`, `loom_delete_journey` (all cross-check that referenced nodes exist before writing)
+
+### `loom-spec export-html [<bundle>] [--out <path>] [--diagram <id>] [--include-tag <list>] [--exclude-tag <list>] [--from-journey <id>] [--root <dir>]`
+
+Builds a single self-contained interactive HTML file — the same viewer as `loom-spec view`, minus the server (no editing, no live sync). Pan/zoom, drill-down, switch diagrams, walk journeys; works offline. Drop it into a docs site, wiki, GitHub Pages, or email attachment.
+
+```bash
+loom-spec export-html                                  # everything
+loom-spec export-html --include-tag public --out docs/architecture.html
+loom-spec export-html --from-journey checkout --out docs/tour.html   # opens at the journey
+loom-spec export-html user-manual                      # a named bundle from .loom/exports.json
+```
+
+Tag filters cascade (drop edges to dropped nodes, shrink groups, clear dangling drill-downs). `--from-journey` scopes to one journey's nodes and opens the HTML at that walkthrough by default.
 
 ### `loom-spec install-mcp [--path <dir>]`
 
@@ -261,9 +299,54 @@ For LangGraph-style multi-step agents or anything with non-trivial internal flow
 
 Click the chevron on the overview's `agent` node to navigate in.
 
+## Journeys
+
+A **Journey** (`.loom/journeys/<id>.journey.json`) is an ordered list of steps, each tied to a node in a diagram — for documenting "how a request flows", an onboarding tour, or a deploy runbook. The viewer renders it as a step-navigator (prev/next; current node glows, prior steps dim-highlight, non-journey nodes fade) so the reader sees one step at a time instead of the whole graph.
+
+```json
+{
+  "version": "1", "id": "checkout", "title": "Customer Checkout",
+  "diagram": "overview",
+  "steps": [
+    { "id": "click-pay", "node": "checkout-page", "title": "User clicks Pay",
+      "code_refs": [{ "path": "src/views/Checkout.tsx", "symbol": "handlePay" }] },
+    { "id": "charge", "node": "payments", "title": "Stripe charge" }
+  ]
+}
+```
+
+Author them with the MCP tools (`loom_create_journey`, `loom_add_step`, …) — each step's `node` is cross-checked against the diagram before writing. Export a focused walkthrough with `loom-spec export-html --from-journey checkout`. Journeys are *ordered* (sequence matters); use **tags** when you only want to mark a *set* of nodes.
+
+## Audio / DSP (real-time safety)
+
+For audio plugins (JUCE / C++) and other real-time systems, loom-spec models signal flow with **typed ports** and catches **real-time-safety** bugs — the #1 cause of audio dropouts.
+
+Declare ports with a `signal` type, then wire `node:port` edges. The viewer colors edges by signal (audio / midi / cv), and `validate` checks port existence and signal compatibility:
+
+```json
+"dsp": {
+  "label": "DSP Module", "color": "#34d399", "icon": "sliders",
+  "ports": {
+    "in":  [{ "name": "in", "signal": "audio" }],
+    "out": [{ "name": "out", "signal": "audio" }]
+  }
+}
+```
+
+Mark a `code_ref` that runs on the audio thread with `realtime: true`:
+
+```json
+{ "id": "eq", "type": "dsp", "label": "EQ",
+  "code_refs": [
+    { "path": "Source/DSP/EQProcessor.cpp", "symbol": "EQProcessor::process", "realtime": true }
+  ] }
+```
+
+`loom-spec validate` extracts that function's **body** (C/C++) and flags audio-thread hazards: heap allocation (`new`/`.resize`/`.push_back`/`std::vector`…), blocking locks (`ScopedLock`/`.lock()`), `juce::String`, logging (`DBG`/`std::cout`), file I/O. It whitelists the correct patterns — atomics, `SmoothedValue`, `ScopedNoDenormals`, non-blocking try-locks. Because the scan is **function-body-scoped**, a blocking lock in a sibling GUI method (not marked `realtime`) is correctly ignored.
+
 ## How AI agents use it
 
-`loom-spec init` writes a `SKILL.md` to `.claude/skills/loom-spec/` following the [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). Claude Code (and other tools that adopt the convention) auto-discovers it.
+`loom-spec init` writes a `SKILL.md` (plus a `reference/` directory) to `.claude/skills/loom-spec/` following the [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). Claude Code (and other tools that adopt the convention) auto-discovers it. The core `SKILL.md` stays lean (progressive disclosure); domain detail — worked examples, validation, audio-dsp, exports, journeys — lives in `reference/` files the agent reads only when relevant.
 
 The skill tells the agent to:
 
